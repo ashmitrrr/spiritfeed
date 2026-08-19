@@ -1,19 +1,26 @@
 import type { FeedPost } from "@/lib/posts"
+import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { relativeTime } from "@/lib/time"
 import { Avatar } from "./Avatar"
 import { ReactionBar } from "./ReactionBar"
 
 export function PostCard({ post }: { post: FeedPost }) {
+  const tagline = spiritAnimalTagline(
+    post.authorAnimal,
+    post.authorNickname,
+    post.authorAdjective,
+  )
   return (
-    <article className="space-y-3 rounded-xl border border-foreground/10 p-3">
+    <article className="pixel-panel space-y-3 p-3">
       <header className="flex items-center gap-2.5">
-        <Avatar animalKey={post.authorAnimal} size="sm" />
-        <div className="min-w-0">
+        <Avatar animalKey={post.authorAnimal} size="md" />
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{post.authorName}</p>
-          <p className="text-xs text-foreground/40">
-            {relativeTime(post.createdAt)}
-          </p>
+          <p className="truncate text-xs text-olive-dark">{tagline}</p>
         </div>
+        <p className="shrink-0 text-xs text-ink/50">
+          {relativeTime(post.createdAt)}
+        </p>
       </header>
 
       {post.postType === "status" ? (
@@ -27,10 +34,10 @@ export function PostCard({ post }: { post: FeedPost }) {
             <img
               src={post.photoUrl}
               alt={post.caption ?? "Photo"}
-              className="w-full rounded-lg object-contain"
+              className="w-full border-2 border-ink object-contain"
             />
           ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed border-foreground/15 px-4 py-10 text-sm text-foreground/40">
+            <div className="flex items-center justify-center border-2 border-dashed border-ink/30 px-4 py-10 text-sm text-ink/50">
               Photo unavailable
             </div>
           )}

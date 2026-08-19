@@ -113,21 +113,18 @@ export function Composer() {
   }
 
   return (
-    <div className="rounded-xl border border-foreground/10 p-3">
-      <div className="mb-3 flex gap-1 rounded-lg bg-foreground/[0.04] p-1 text-sm">
+    <div className="pixel-panel p-3">
+      <div className="mb-3 flex gap-2 text-sm">
         {(["photo", "status"] as const).map((m) => (
           <button
             key={m}
             type="button"
+            data-active={mode === m}
             onClick={() => {
               setMode(m)
               setError(null)
             }}
-            className={`flex-1 rounded-md px-3 py-1.5 capitalize transition ${
-              mode === m
-                ? "bg-background font-medium shadow-sm"
-                : "text-foreground/60 hover:text-foreground"
-            }`}
+            className="pixel-chip flex-1 px-3 py-1.5 capitalize"
           >
             {m}
           </button>
@@ -150,13 +147,13 @@ export function Composer() {
               <img
                 src={previewUrl}
                 alt="Selected preview"
-                className="max-h-80 w-full rounded-lg object-contain"
+                className="max-h-80 w-full border-2 border-ink object-contain"
               />
               <button
                 type="button"
                 onClick={resetPhoto}
                 disabled={isPending}
-                className="text-xs text-foreground/60 underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+                className="text-xs text-ink/60 underline underline-offset-4 hover:text-ink disabled:opacity-50"
               >
                 Remove photo
               </button>
@@ -165,7 +162,7 @@ export function Composer() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex w-full items-center justify-center rounded-lg border border-dashed border-foreground/20 px-4 py-10 text-sm text-foreground/60 transition hover:border-foreground/40"
+              className="flex w-full items-center justify-center border-2 border-dashed border-ink/40 px-4 py-10 text-sm text-ink/60 active:translate-x-px active:translate-y-px"
             >
               Tap to choose a photo
             </button>
@@ -177,14 +174,14 @@ export function Composer() {
             onChange={(e) => setCaption(e.target.value)}
             maxLength={CAPTION_MAX}
             placeholder="Add a caption (optional)"
-            className="w-full rounded-lg border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
+            className="pixel-input px-3 py-2 text-sm"
           />
 
           <button
             type="button"
             onClick={submitPhoto}
             disabled={isPending || !file}
-            className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="pixel-btn pixel-btn-primary w-full px-4 py-2.5 text-sm"
           >
             {isPending ? "Posting…" : "Post photo"}
           </button>
@@ -197,17 +194,17 @@ export function Composer() {
             maxLength={STATUS_MAX}
             rows={2}
             placeholder="What's your status?"
-            className="w-full resize-none rounded-lg border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
+            className="pixel-input resize-none px-3 py-2 text-sm"
           />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-foreground/40">
+            <span className="text-xs text-ink/50">
               {status.length}/{STATUS_MAX}
             </span>
             <button
               type="button"
               onClick={submitStatus}
               disabled={isPending || status.trim().length === 0}
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className="pixel-btn pixel-btn-primary px-4 py-2 text-sm"
             >
               {isPending ? "Posting…" : "Set status"}
             </button>
@@ -216,9 +213,7 @@ export function Composer() {
       )}
 
       {error && (
-        <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
-          {error}
-        </p>
+        <p className="pixel-alert mt-3 px-3 py-2 text-sm">{error}</p>
       )}
     </div>
   )

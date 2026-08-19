@@ -102,6 +102,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          animal_adjective: string | null
+          animal_nickname: string | null
           created_at: string
           display_name: string
           id: string
@@ -110,6 +112,8 @@ export type Database = {
           username: string
         }
         Insert: {
+          animal_adjective?: string | null
+          animal_nickname?: string | null
           created_at?: string
           display_name: string
           id: string
@@ -118,6 +122,8 @@ export type Database = {
           username: string
         }
         Update: {
+          animal_adjective?: string | null
+          animal_nickname?: string | null
           created_at?: string
           display_name?: string
           id?: string
@@ -202,21 +208,27 @@ export type Database = {
       }
       spirit_animals: {
         Row: {
-          icon_url: string
+          icon_url: string | null
+          image_path: string | null
           key: string
           label: string
+          personality_blurb: string | null
           taken_by: string | null
         }
         Insert: {
-          icon_url: string
+          icon_url?: string | null
+          image_path?: string | null
           key: string
           label: string
+          personality_blurb?: string | null
           taken_by?: string | null
         }
         Update: {
-          icon_url?: string
+          icon_url?: string | null
+          image_path?: string | null
           key?: string
           label?: string
+          personality_blurb?: string | null
           taken_by?: string | null
         }
         Relationships: [

@@ -10,14 +10,16 @@ export default async function LoginPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">SpiritFeed</h1>
-        <p className="text-sm text-foreground/60">Welcome back — sign in.</p>
+      <div className="space-y-2 text-center">
+        <h1 className="font-display text-2xl lowercase tracking-tight text-olive-dark">
+          spiritfeed
+        </h1>
+        <p className="text-sm text-ink/70">Welcome back — sign in.</p>
       </div>
 
       <LoginForm />
 
-      <p className="text-center text-xs text-foreground/40">
+      <p className="text-center text-xs text-ink/50">
         No account? You&apos;ll need an invite link from the group.
       </p>
     </div>

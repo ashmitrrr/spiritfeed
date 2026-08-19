@@ -14,6 +14,8 @@ export async function joinAction(
   const username = String(formData.get("username") ?? "")
   const password = String(formData.get("password") ?? "")
   const animalKey = String(formData.get("animalKey") ?? "")
+  const animalNickname = String(formData.get("animalNickname") ?? "")
+  const animalAdjective = String(formData.get("animalAdjective") ?? "")
 
   if (!token) {
     return { error: "This invite link is missing its token." }
@@ -23,6 +25,8 @@ export async function joinAction(
     username,
     password,
     animalKey,
+    animalNickname,
+    animalAdjective,
     inviteToken: token,
   })
 

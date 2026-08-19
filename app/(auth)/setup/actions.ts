@@ -13,11 +13,15 @@ export async function setupAction(
   const username = String(formData.get("username") ?? "")
   const password = String(formData.get("password") ?? "")
   const animalKey = String(formData.get("animalKey") ?? "")
+  const animalNickname = String(formData.get("animalNickname") ?? "")
+  const animalAdjective = String(formData.get("animalAdjective") ?? "")
 
   const result = await createAccount({
     username,
     password,
     animalKey,
+    animalNickname,
+    animalAdjective,
     isAdmin: true,
     requireNoExistingProfiles: true,
   })

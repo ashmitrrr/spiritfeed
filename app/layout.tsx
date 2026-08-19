@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from "next"
-import { Geist } from "next/font/google"
+import { Pixelify_Sans, Silkscreen } from "next/font/google"
 
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body copy / form inputs / longer UI text — readable pixel font.
+const pixelifySans = Pixelify_Sans({
+  variable: "--font-pixelify",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+})
+
+// Headers / logo / buttons — chunky bitmap font.
+const silkscreen = Silkscreen({
+  variable: "--font-silkscreen",
+  subsets: ["latin"],
+  weight: ["400", "700"],
 })
 
 export const metadata: Metadata = {
@@ -14,7 +23,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#8b8c63",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -22,7 +31,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${pixelifySans.variable} ${silkscreen.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   )

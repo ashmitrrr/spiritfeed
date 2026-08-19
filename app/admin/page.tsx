@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 
 import { getCurrentProfile } from "@/lib/auth/session"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { spiritAnimalTagline } from "@/lib/spirit-animals"
+import { Avatar } from "../_components/Avatar"
 import { CopyButton } from "./_components/CopyButton"
 import { generateInviteAction } from "./actions"
 
@@ -25,21 +27,25 @@ export default async function AdminPage() {
       .from("invites")
       .select("token, created_at, used_at, used_by")
       .order("created_at", { ascending: false }),
-    admin.from("profiles").select("id, display_name"),
+    admin
+      .from("profiles")
+      .select(
+        "id, display_name, spirit_animal, animal_nickname, animal_adjective",
+      ),
     getBaseUrl(),
   ])
 
-  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]))
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
   const pending = (invites ?? []).filter((i) => !i.used_at)
   const used = (invites ?? []).filter((i) => i.used_at)
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 space-y-8 px-5 py-8">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Admin · Invites</h1>
+        <h1 className="font-display text-lg tracking-tight">Admin · Invites</h1>
         <Link
           href="/"
-          className="text-sm text-foreground/60 underline underline-offset-4 hover:text-foreground"
+          className="text-sm text-ink/60 underline underline-offset-4 hover:text-ink"
         >
           Back to feed
         </Link>
@@ -48,18 +54,18 @@ export default async function AdminPage() {
       <form action={generateInviteAction}>
         <button
           type="submit"
-          className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90"
+          className="pixel-btn pixel-btn-primary w-full px-4 py-2.5 text-sm"
         >
           Generate new invite link
         </button>
       </form>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground/70">
+        <h2 className="text-sm font-medium text-ink/70">
           Pending ({pending.length})
         </h2>
         {pending.length === 0 ? (
-          <p className="text-sm text-foreground/40">No pending invites.</p>
+          <p className="text-sm text-ink/50">No pending invites.</p>
         ) : (
           <ul className="space-y-2">
             {pending.map((invite) => {
@@ -67,9 +73,9 @@ export default async function AdminPage() {
               return (
                 <li
                   key={invite.token}
-                  className="flex items-center gap-2 rounded-lg border border-foreground/10 px-3 py-2"
+                  className="flex items-center gap-2 border-2 border-ink bg-white px-3 py-2"
                 >
-                  <code className="flex-1 truncate text-xs text-foreground/70">
+                  <code className="flex-1 truncate text-xs text-ink/70">
                     {url}
                   </code>
                   <CopyButton value={url} />
@@ -81,33 +87,47 @@ export default async function AdminPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground/70">
+        <h2 className="text-sm font-medium text-ink/70">
           Used ({used.length})
         </h2>
         {used.length === 0 ? (
-          <p className="text-sm text-foreground/40">No invites used yet.</p>
+          <p className="text-sm text-ink/50">No invites used yet.</p>
         ) : (
           <ul className="space-y-2">
-            {used.map((invite) => (
-              <li
-                key={invite.token}
-                className="flex items-center justify-between rounded-lg border border-foreground/10 px-3 py-2 text-sm"
-              >
-                <span className="text-foreground/50">
-                  Joined by{" "}
-                  <span className="text-foreground/80">
-                    {invite.used_by
-                      ? nameById.get(invite.used_by) ?? "someone"
-                      : "someone"}
+            {used.map((invite) => {
+              const member = invite.used_by
+                ? profileById.get(invite.used_by)
+                : undefined
+              return (
+                <li
+                  key={invite.token}
+                  className="flex items-center gap-2.5 border-2 border-ink/40 bg-white px-3 py-2 text-sm"
+                >
+                  {member ? (
+                    <Avatar animalKey={member.spirit_animal} size="sm" />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-ink">
+                      {member?.display_name ?? "someone"}
+                    </p>
+                    {member && (
+                      <p className="truncate text-xs text-olive-dark">
+                        {spiritAnimalTagline(
+                          member.spirit_animal,
+                          member.animal_nickname,
+                          member.animal_adjective,
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-ink/40">
+                    {invite.used_at
+                      ? new Date(invite.used_at).toLocaleDateString()
+                      : ""}
                   </span>
-                </span>
-                <span className="text-xs text-foreground/30">
-                  {invite.used_at
-                    ? new Date(invite.used_at).toLocaleDateString()
-                    : ""}
-                </span>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

@@ -29,11 +29,11 @@ export default async function SetupPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <div className="space-y-2 text-center">
+        <h1 className="font-display text-lg tracking-tight text-olive-dark">
           Welcome to SpiritFeed
         </h1>
-        <p className="text-sm text-foreground/60">
+        <p className="text-sm text-ink/70">
           Set up the first account — this one becomes the admin.
         </p>
       </div>

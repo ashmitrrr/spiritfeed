@@ -67,15 +67,13 @@ export function ReactionBar({ postId, initialCounts, initialMine }: Props) {
             type="button"
             onClick={() => onTap(emoji)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm transition ${
-              active
-                ? "border-foreground/40 bg-foreground/[0.08]"
-                : "border-foreground/10 hover:border-foreground/25"
-            }`}
+            className="pixel-chip gap-1 px-2.5 py-1 text-sm"
           >
             <span aria-hidden>{emoji}</span>
             {count > 0 && (
-              <span className="text-xs text-foreground/60">{count}</span>
+              <span className={`text-xs ${active ? "text-white" : "text-ink/60"}`}>
+                {count}
+              </span>
             )}
           </button>
         )

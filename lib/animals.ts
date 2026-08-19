@@ -14,7 +14,10 @@ export async function getAnimalOptions(): Promise<AnimalOption[]> {
   const admin = createAdminClient()
 
   const [{ data: animals }, { data: profiles }] = await Promise.all([
-    admin.from("spirit_animals").select("key, label, taken_by").order("label"),
+    admin
+      .from("spirit_animals")
+      .select("key, label, image_path, personality_blurb, taken_by")
+      .order("label"),
     admin.from("profiles").select("id, display_name"),
   ])
 
@@ -23,6 +26,8 @@ export async function getAnimalOptions(): Promise<AnimalOption[]> {
   return (animals ?? []).map((a) => ({
     key: a.key,
     label: a.label,
+    imagePath: a.image_path,
+    personalityBlurb: a.personality_blurb,
     takenByName: a.taken_by ? nameById.get(a.taken_by) ?? "Taken" : null,
   }))
 }

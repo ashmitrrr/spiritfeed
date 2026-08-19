@@ -53,14 +53,11 @@ export default async function JoinPage({
     const copy = INVALID_COPY[check.reason]
     return (
       <div className="space-y-4 text-center">
-        <p className="text-4xl" aria-hidden>
-          🐾
-        </p>
-        <h1 className="text-xl font-semibold tracking-tight">{copy.title}</h1>
-        <p className="text-sm text-foreground/60">{copy.body}</p>
+        <h1 className="font-display text-lg tracking-tight">{copy.title}</h1>
+        <p className="text-sm text-ink/70">{copy.body}</p>
         <Link
           href="/login"
-          className="inline-block text-sm text-foreground/70 underline underline-offset-4 hover:text-foreground"
+          className="inline-block text-sm text-ink underline underline-offset-4 hover:text-olive-dark"
         >
           Go to login
         </Link>
@@ -72,11 +69,11 @@ export default async function JoinPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <div className="space-y-2 text-center">
+        <h1 className="font-display text-xl tracking-tight text-olive-dark">
           You&apos;re invited
         </h1>
-        <p className="text-sm text-foreground/60">
+        <p className="text-sm text-ink/70">
           Set up your account and pick your spirit animal.
         </p>
       </div>

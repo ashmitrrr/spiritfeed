@@ -3,6 +3,106 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Phase — Spirit animal personality system (done)
+
+Replaced emoji spirit-animals with real pixel-art portraits and added a
+personality/naming step to onboarding.
+
+**Assets**: copied+renamed 15 files from `public/animals_bg/` into
+`public/spirit-animals/{key}.jpg` (rabbit, owl, hedgehog, panda, capybara,
+dolphin, otter, octopus, sheep, cat, whale, dog, giraffe, monkey, goat).
+Originals left in place — still used by the auth collage background.
+
+**Avatars everywhere → real images** (`next/image`): `lib/spirit-animals.ts`
+rewritten — dropped `SPIRIT_ANIMAL_EMOJI`/`spiritAnimalEmoji`, added
+`SPIRIT_ANIMAL_LABELS`, `spiritAnimalImage(key)` (deterministic
+`/spirit-animals/{key}.jpg`), `spiritAnimalLabel(key)`, and
+`spiritAnimalTagline(key, nickname, adjective, {short})`. `Avatar`,
+`AnimalPicker`, `PostCard`, feed header (`page.tsx`), and admin now render
+portraits. Verified static key set (15) exactly matches the DB keys + labels and
+`image_path` values; `next/image` optimizer serves them (no config needed for
+`/public`).
+
+**New onboarding flow** (`OnboardingForm.tsx`, both `/setup` + `/join`) — a
+5-step wizard: (1) username/password + animal grid, (2) personality reveal
+("You've chosen the [Animal] to be your spirit." + `personality_blurb`),
+(3) name your animal, (4) choose an adjective, (5) final tagline reveal
+("[Adjective] [Nickname] the [Animal]") → submit. Implemented as one `<form>`:
+credential inputs stay mounted (hidden after step 1, so they still submit but are
+barred from constraint validation); animal key/nickname/adjective are mirrored
+from React state into hidden inputs. **Atomic animal-claim logic in
+`onboarding.ts` is unchanged** — just added `animalNickname`/`animalAdjective`
+params, validation, and two columns on the profile insert.
+
+**Persistence + display**: `profiles.animal_nickname` / `animal_adjective` saved
+on signup (both required, capped 24 chars via
+`validateAnimalPersona` in `credentials.ts`, no profanity filter per Ashmit).
+Tagline shown next to the avatar in the feed header (short form: "Tommy the
+Dog"), each post card (full form), and the admin members list.
+
+**Graceful fallback**: 3 profiles already existed before these columns
+(octopus/owl/panda holders) with null nickname/adjective — `spiritAnimalTagline`
+degrades to "the [Animal]" → just "[Animal]", so nothing breaks for them.
+
+**No more emoji for animals** — removed the last decorative emoji (🐾 on the
+invalid-invite page). ⚠️ **Interpretation to confirm**: I kept the emoji
+*reaction* set (🔥❤️😂👀😮) since that's the reactions feature from Phase 2, not
+an animal placeholder. If "no emojis anywhere" was meant to include reactions
+too, say so and I'll swap them for something else.
+
+**Verified**: `npm run lint` + `npm run build` clean; dev smoke test — `/login`
+200, `/spirit-animals/dog.jpg` 200, `next/image` optimize 200, `/setup` correctly
+307-redirects (profiles exist). DB confirmed: 15 animals, all with `image_path` +
+`personality_blurb`.
+
+## Phase 3.5 — Visual design pass (done)
+
+Styling-only pass per `DESIGN.md`. **No new features, no schema/RLS/Server Action
+logic touched** — purely presentational.
+
+**Design tokens** (`app/globals.css`): palette as CSS vars + Tailwind theme
+tokens — `--olive #8b8c63`, `--olive-dark #6f7049`, `--bone #ece6d5`,
+`--bone-dim`, `--ink #322e27` (borders/shadows/text), `--white`, `--error`. Page
+background = bone, text = ink. **`border-radius: 0` set globally** (base-layer
+`* { border-radius: 0 }`) — removes Tailwind's default rounding app-wide;
+avatars/cards/inputs/buttons are all hard-square now.
+
+**Typography** (`app/layout.tsx`, `next/font/google`): **Silkscreen** for
+headers/logo/buttons (`.font-display`, `h1/h2/h3`, `.pixel-btn`); **Pixelify
+Sans** for body copy + form inputs (default `body` font, `.pixel-input`).
+
+**UI style** — reusable component classes in `globals.css`: `.pixel-panel`
+(white, 3px ink border, `4px 4px 0` hard shadow), `.pixel-card` (bone auth card,
+deeper `6px 6px 0` shadow), `.pixel-input` (2px border, olive focus), `.pixel-btn`
++ `-primary`/`-secondary` (chunky border + hard shadow, **pressed state = 3px
+offset shift, no opacity fade**), `.pixel-chip` (tabs/reactions, olive fill when
+`aria-pressed`/`data-active`), `.pixel-alert`. Replaced every hairline
+`border-foreground/10` + `rounded-*` + `dark:` style across the feed, composer,
+reactions, post cards, onboarding, login, admin.
+
+**Auth collage** (`app/(auth)/_components/CollageBackground.tsx` + auth
+`layout.tsx`): full-bleed tiled grid of the pixel-animal portraits in
+`public/animals_bg/` under a semi-opaque olive wash (`bg-olive/80`), with the
+bone `.pixel-card` centered on top (Canva sign-in structure). Applies to
+`/login`, `/join/[token]`, `/setup`. **Excluded 2 of the 19 images**: the
+watermarked donkey (`879609370971139963.jpeg`, has a 小红书 stamp) and the
+low-res `Octopus.jpeg` — 17 images used, tiled ×3 to fill large viewports.
+Special-char filenames (spaces, Cyrillic) are `encodeURIComponent`-ed; verified
+all 17 resolve.
+
+**Spirit-animal avatars**: left as the current emoji placeholders per Ashmit —
+no real pixel-art avatar set yet.
+
+**Verified**: `npm run lint` + `npm run build` clean; dev smoke test — `/login`
+200, collage `<img>`s present and served (200), `.pixel-card` renders.
+
+**⚠️ Flag for Ashmit**: the olive hex (`#8b8c63`) is a best-guess sampled from
+the pasted logo *screenshot*, not the real logo file. If it reads off once you
+see it applied, send the actual logo (SVG/PNG) and I'll resample `--olive` /
+`--olive-dark` (and can derive `--bone`/`--ink` from it too). Also still open
+from earlier phases: real pixel-art avatars (needs a curated one-per-animal set)
+and final reaction-emoji set.
+
 ## Phase 2 — Core posting & feed (done)
 
 The MVP core loop: post a photo, post a status, see the feed, react with emoji.

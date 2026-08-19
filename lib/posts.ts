@@ -11,6 +11,8 @@ export type FeedPost = {
   authorId: string
   authorName: string
   authorAnimal: string
+  authorNickname: string | null
+  authorAdjective: string | null
   postType: "photo" | "status"
   caption: string | null
   /** Signed URL for the photo, or null for status posts / unresolvable photos. */
@@ -23,7 +25,12 @@ export type FeedPost = {
   myReactions: string[]
 }
 
-type AuthorEmbed = { display_name: string; spirit_animal: string } | null
+type AuthorEmbed = {
+  display_name: string
+  spirit_animal: string
+  animal_nickname: string | null
+  animal_adjective: string | null
+} | null
 
 function firstAuthor(value: AuthorEmbed | AuthorEmbed[]): AuthorEmbed {
   return Array.isArray(value) ? (value[0] ?? null) : value
@@ -47,7 +54,7 @@ export async function getFeed(): Promise<FeedPost[]> {
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
-      "id, author_id, caption, photo_path, post_type, created_at, is_time_capsule, unlock_at, author:profiles!posts_author_id_fkey(display_name, spirit_animal)",
+      "id, author_id, caption, photo_path, post_type, created_at, is_time_capsule, unlock_at, author:profiles!posts_author_id_fkey(display_name, spirit_animal, animal_nickname, animal_adjective)",
     )
     .or(`is_time_capsule.eq.false,unlock_at.lte.${nowIso}`)
     .order("created_at", { ascending: false })
@@ -103,6 +110,8 @@ export async function getFeed(): Promise<FeedPost[]> {
       authorId: p.author_id,
       authorName: author?.display_name ?? "Unknown",
       authorAnimal: author?.spirit_animal ?? "",
+      authorNickname: author?.animal_nickname ?? null,
+      authorAdjective: author?.animal_adjective ?? null,
       postType: p.post_type === "status" ? "status" : "photo",
       caption: p.caption,
       photoUrl,

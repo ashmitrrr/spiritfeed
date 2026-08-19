@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import {
   normalizeUsername,
   usernameToEmail,
+  validateAnimalPersona,
   validatePassword,
   validateUsername,
 } from "@/lib/auth/credentials"
@@ -12,6 +13,10 @@ export type CreateAccountParams = {
   username: string
   password: string
   animalKey: string
+  /** Free-text name the user gives their spirit animal (e.g. "Tommy"). */
+  animalNickname: string
+  /** Free-text adjective for the animal (e.g. "Sleepy"). */
+  animalAdjective: string
   /** Marks the new profile as the app owner. Used by the /setup bootstrap. */
   isAdmin?: boolean
   /** When set, the account is created via this invite token (marked used). */
@@ -54,6 +59,8 @@ export async function createAccount(
   const displayName = params.username.trim()
   const password = params.password
   const animalKey = params.animalKey
+  const animalNickname = params.animalNickname.trim()
+  const animalAdjective = params.animalAdjective.trim()
 
   // 1. Input format
   const usernameError = validateUsername(username)
@@ -61,6 +68,8 @@ export async function createAccount(
   const passwordError = validatePassword(password)
   if (passwordError) return { ok: false, error: passwordError }
   if (!animalKey) return { ok: false, error: "Please pick a spirit animal." }
+  const personaError = validateAnimalPersona(animalNickname, animalAdjective)
+  if (personaError) return { ok: false, error: personaError }
 
   // 1a. Bootstrap fast pre-check (not itself race-safe — see the atomic lock
   // claim below, which is what actually prevents a double-admin race).
@@ -169,6 +178,8 @@ export async function createAccount(
     username,
     display_name: displayName,
     spirit_animal: animalKey,
+    animal_nickname: animalNickname,
+    animal_adjective: animalAdjective,
     is_admin: params.isAdmin ?? false,
   })
   if (profileError) {

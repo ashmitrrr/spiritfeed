@@ -5,7 +5,7 @@ export function SignOutButton({ className }: { className?: string }) {
         type="submit"
         className={
           className ??
-          "text-sm text-foreground/60 underline underline-offset-4 hover:text-foreground"
+          "text-sm text-ink/60 underline underline-offset-4 hover:text-ink"
         }
       >
         Sign out

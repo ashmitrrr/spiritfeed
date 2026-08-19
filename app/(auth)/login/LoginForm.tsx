@@ -14,7 +14,7 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-4">
-      <label className="block space-y-1">
+      <label className="block space-y-1.5">
         <span className="text-sm font-medium">Username</span>
         <input
           name="username"
@@ -23,31 +23,29 @@ export function LoginForm() {
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          className="w-full rounded-lg border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
+          className="pixel-input px-3 py-2 text-sm"
         />
       </label>
 
-      <label className="block space-y-1">
+      <label className="block space-y-1.5">
         <span className="text-sm font-medium">Password</span>
         <input
           name="password"
           type="password"
           required
           autoComplete="current-password"
-          className="w-full rounded-lg border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
+          className="pixel-input px-3 py-2 text-sm"
         />
       </label>
 
       {state.error && (
-        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
-          {state.error}
-        </p>
+        <p className="pixel-alert px-3 py-2 text-sm">{state.error}</p>
       )}
 
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+        className="pixel-btn pixel-btn-primary w-full px-4 py-2.5 text-sm"
       >
         {isPending ? "Signing in…" : "Sign in"}
       </button>
