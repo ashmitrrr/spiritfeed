@@ -5,16 +5,27 @@ import { Avatar } from "./Avatar"
 import { ReactionBar } from "./ReactionBar"
 import { RichText } from "./RichText"
 
-export function PostCard({ post }: { post: FeedPost }) {
+export function PostCard({
+  post,
+  crownHolderId,
+}: {
+  post: FeedPost
+  crownHolderId?: string | null
+}) {
   const tagline = spiritAnimalTagline(
     post.authorAnimal,
     post.authorNickname,
     post.authorAdjective,
   )
+  const progress = post.promptProgress
   return (
     <article className="pixel-panel space-y-3 p-3">
       <header className="flex items-center gap-2.5">
-        <Avatar animalKey={post.authorAnimal} size="md" />
+        <Avatar
+          animalKey={post.authorAnimal}
+          size="md"
+          crowned={Boolean(crownHolderId) && post.authorId === crownHolderId}
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{post.authorName}</p>
           <p className="truncate text-xs text-olive-dark">{tagline}</p>
@@ -51,6 +62,17 @@ export function PostCard({ post }: { post: FeedPost }) {
           )}
         </>
       )}
+
+      {progress &&
+        (progress.approved ? (
+          <p className="inline-flex w-fit items-center gap-1 border-2 border-ink bg-olive px-2 py-0.5 text-xs text-white">
+            🔥 Prompt approved
+          </p>
+        ) : (
+          <p className="inline-flex w-fit items-center gap-1 border-2 border-ink bg-white px-2 py-0.5 text-xs text-ink">
+            🔥 {progress.count}/{progress.threshold} fires needed
+          </p>
+        ))}
 
       <ReactionBar
         postId={post.id}

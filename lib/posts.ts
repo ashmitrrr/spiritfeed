@@ -23,6 +23,14 @@ export type FeedPost = {
   isTimeCapsule: boolean
   reactionCounts: Record<string, number>
   myReactions: string[]
+  /** Set when this post is a Prompt-of-the-Day submission. */
+  dailyPromptId: string | null
+  /** Fire-approval progress for prompt submissions; null for normal posts. */
+  promptProgress: {
+    count: number
+    threshold: number
+    approved: boolean
+  } | null
 }
 
 type AuthorEmbed = {
@@ -64,7 +72,7 @@ export async function getFeed(): Promise<FeedPost[]> {
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
-      "id, author_id, caption, photo_path, post_type, created_at, is_time_capsule, unlock_at, author:profiles!posts_author_id_fkey(display_name, spirit_animal, animal_nickname, animal_adjective)",
+      "id, author_id, caption, photo_path, post_type, created_at, is_time_capsule, unlock_at, daily_prompt_id, author:profiles!posts_author_id_fkey(display_name, spirit_animal, animal_nickname, animal_adjective)",
     )
     .or(
       `and(is_time_capsule.eq.false,created_at.gt.${cutoffIso}),and(is_time_capsule.eq.true,unlock_at.lte.${nowIso})`,
@@ -84,6 +92,8 @@ export async function getFeed(): Promise<FeedPost[]> {
 
   const countsByPost = new Map<string, Record<string, number>>()
   const mineByPost = new Map<string, string[]>()
+  // Distinct 🔥 reactors per post (used for prompt-approval progress).
+  const fireReactorsByPost = new Map<string, Set<string>>()
   for (const r of reactions ?? []) {
     const counts = countsByPost.get(r.post_id) ?? {}
     counts[r.emoji] = (counts[r.emoji] ?? 0) + 1
@@ -93,6 +103,22 @@ export async function getFeed(): Promise<FeedPost[]> {
       mine.push(r.emoji)
       mineByPost.set(r.post_id, mine)
     }
+    if (r.emoji === "🔥") {
+      const set = fireReactorsByPost.get(r.post_id) ?? new Set<string>()
+      set.add(r.user_id)
+      fireReactorsByPost.set(r.post_id, set)
+    }
+  }
+
+  // Approval threshold only needed if a prompt submission is on screen.
+  const hasPromptPost = posts.some((p) => p.daily_prompt_id)
+  let fireThreshold = 0
+  if (hasPromptPost) {
+    const admin = createAdminClient()
+    const { count } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+    fireThreshold = Math.ceil((count ?? 0) / 2)
   }
 
   // Signed URLs for photos, generated with the service-role client (the bucket
@@ -117,6 +143,21 @@ export async function getFeed(): Promise<FeedPost[]> {
     const photoUrl = p.photo_path
       ? signedByPath.get(p.photo_path) ?? null
       : null
+
+    let promptProgress: FeedPost["promptProgress"] = null
+    if (p.daily_prompt_id) {
+      const reactors = fireReactorsByPost.get(p.id)
+      let count = 0
+      if (reactors) {
+        for (const uid of reactors) if (uid !== p.author_id) count++
+      }
+      promptProgress = {
+        count,
+        threshold: fireThreshold,
+        approved: fireThreshold > 0 && count >= fireThreshold,
+      }
+    }
+
     return {
       id: p.id,
       authorId: p.author_id,
@@ -132,6 +173,8 @@ export async function getFeed(): Promise<FeedPost[]> {
       isTimeCapsule: p.is_time_capsule,
       reactionCounts: countsByPost.get(p.id) ?? {},
       myReactions: mineByPost.get(p.id) ?? [],
+      dailyPromptId: p.daily_prompt_id,
+      promptProgress,
     }
   })
 }

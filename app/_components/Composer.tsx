@@ -17,11 +17,19 @@ import { MentionInput } from "./MentionInput"
 
 type Mode = "photo" | "status"
 
-export function Composer({ mentionables }: { mentionables: Mentionable[] }) {
+export function Composer({
+  mentionables,
+  promptSubmission,
+}: {
+  mentionables: Mentionable[]
+  /** Present when there's a live prompt the user hasn't submitted to yet. */
+  promptSubmission?: { promptId: string; promptText: string } | null
+}) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>("photo")
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [submitAsPrompt, setSubmitAsPrompt] = useState(false)
 
   // photo mode
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -84,6 +92,9 @@ export function Composer({ mentionables }: { mentionables: Mentionable[] }) {
       const fd = new FormData()
       fd.append("photo", blob, "photo.jpg")
       fd.append("caption", caption)
+      if (promptSubmission && submitAsPrompt) {
+        fd.append("dailyPromptId", promptSubmission.promptId)
+      }
       const res = await createPhotoPost(fd)
       if (!res.ok) {
         setError(res.error)
@@ -104,6 +115,9 @@ export function Composer({ mentionables }: { mentionables: Mentionable[] }) {
     startTransition(async () => {
       const fd = new FormData()
       fd.append("status", text)
+      if (promptSubmission && submitAsPrompt) {
+        fd.append("dailyPromptId", promptSubmission.promptId)
+      }
       const res = await createStatusPost(fd)
       if (!res.ok) {
         setError(res.error)
@@ -216,6 +230,23 @@ export function Composer({ mentionables }: { mentionables: Mentionable[] }) {
             </button>
           </div>
         </div>
+      )}
+
+      {promptSubmission && (
+        <label className="mt-3 flex cursor-pointer items-start gap-2 border-2 border-ink bg-bone px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={submitAsPrompt}
+            onChange={(e) => setSubmitAsPrompt(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--olive)]"
+          />
+          <span className="min-w-0">
+            <span className="font-medium">Submit as today&apos;s prompt 🔥</span>
+            <span className="block truncate text-xs text-ink/60">
+              {promptSubmission.promptText}
+            </span>
+          </span>
+        </label>
       )}
 
       {error && (

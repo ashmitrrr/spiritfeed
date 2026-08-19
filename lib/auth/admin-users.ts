@@ -95,6 +95,44 @@ export async function deleteUserCompletely(
     .update({ claimed_by: null })
     .eq("claimed_by", userId)
 
+  // 7a. Prompt-of-the-Day references to profiles are all NO ACTION, so clear
+  //     them before the profile can be deleted:
+  //     - spirit_crown.holder_id: vacate the crown if they held it (keep the row).
+  //     - prompt_assignments: drop their assignment history.
+  //     - daily_prompts.author_id is NOT NULL, so reassign any prompts they
+  //       authored to a surviving member (prefer an admin) to keep group
+  //       history + everyone's submissions intact.
+  await admin
+    .from("spirit_crown")
+    .update({ holder_id: null })
+    .eq("holder_id", userId)
+  await admin.from("prompt_assignments").delete().eq("user_id", userId)
+
+  const { data: authored } = await admin
+    .from("daily_prompts")
+    .select("id")
+    .eq("author_id", userId)
+  if (authored && authored.length > 0) {
+    const { data: heir } = await admin
+      .from("profiles")
+      .select("id")
+      .neq("id", userId)
+      .order("is_admin", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (heir) {
+      await admin
+        .from("daily_prompts")
+        .update({ author_id: heir.id })
+        .eq("author_id", userId)
+    } else {
+      // No surviving member (shouldn't happen — you can't remove yourself).
+      const ids = authored.map((a) => a.id)
+      await admin.from("posts").update({ daily_prompt_id: null }).in("daily_prompt_id", ids)
+      await admin.from("daily_prompts").delete().in("id", ids)
+    }
+  }
+
   // 8. Finally delete the auth user; profiles cascades from auth.users.
   const { error: authError } = await admin.auth.admin.deleteUser(userId)
   if (authError) {

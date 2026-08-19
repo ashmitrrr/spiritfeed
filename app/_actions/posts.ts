@@ -23,6 +23,48 @@ function extensionFor(type: string): string {
   return "jpg"
 }
 
+type PromptResolution =
+  | { ok: true; dailyPromptId: string | null }
+  | { ok: false; error: string }
+
+/**
+ * Validates an optional "submit as today's prompt" tag on a new post: the prompt
+ * must exist and still be inside its window, and the user can only submit once
+ * per prompt. Returns the id to attach (or null if the post isn't a submission).
+ */
+async function resolvePromptSubmission(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  formData: FormData,
+): Promise<PromptResolution> {
+  const promptId = String(formData.get("dailyPromptId") ?? "").trim()
+  if (!promptId) return { ok: true, dailyPromptId: null }
+
+  const { data: prompt } = await admin
+    .from("daily_prompts")
+    .select("id, window_ends_at")
+    .eq("id", promptId)
+    .maybeSingle()
+  if (!prompt) {
+    return { ok: false, error: "Today's prompt is no longer available." }
+  }
+  if (new Date(prompt.window_ends_at).getTime() <= Date.now()) {
+    return { ok: false, error: "The prompt window has closed." }
+  }
+
+  const { data: existing } = await admin
+    .from("posts")
+    .select("id")
+    .eq("daily_prompt_id", promptId)
+    .eq("author_id", userId)
+    .maybeSingle()
+  if (existing) {
+    return { ok: false, error: "You've already submitted for today's prompt." }
+  }
+
+  return { ok: true, dailyPromptId: promptId }
+}
+
 /** Create a photo post: upload the (already client-compressed) image, then row. */
 export async function createPhotoPost(
   formData: FormData,
@@ -51,6 +93,10 @@ export async function createPhotoPost(
   const caption = rawCaption.length > 0 ? rawCaption : null
 
   const admin = createAdminClient()
+
+  const prompt = await resolvePromptSubmission(admin, user.id, formData)
+  if (!prompt.ok) return { ok: false, error: prompt.error }
+
   const postId = randomUUID()
   const path = `${user.id}/${postId}.${extensionFor(photo.type)}`
 
@@ -70,6 +116,7 @@ export async function createPhotoPost(
     post_type: "photo",
     photo_path: path,
     caption,
+    daily_prompt_id: prompt.dailyPromptId,
   })
   if (insertError) {
     // Roll back the orphaned upload so storage doesn't accumulate junk.
@@ -100,11 +147,16 @@ export async function createStatusPost(
   }
 
   const admin = createAdminClient()
+
+  const prompt = await resolvePromptSubmission(admin, user.id, formData)
+  if (!prompt.ok) return { ok: false, error: prompt.error }
+
   const { error } = await admin.from("posts").insert({
     author_id: user.id,
     post_type: "status",
     caption: text,
     photo_path: null,
+    daily_prompt_id: prompt.dailyPromptId,
   })
   if (error) {
     return { ok: false, error: "Couldn't save your status. Please try again." }

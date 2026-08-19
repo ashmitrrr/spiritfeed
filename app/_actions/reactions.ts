@@ -2,6 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { isReactionEmoji } from "@/lib/reactions"
+import { evaluatePromptFire } from "@/lib/prompts"
+
+const FIRE_EMOJI = "🔥"
 
 export type ToggleReactionResult =
   | { ok: true; reacted: boolean }
@@ -50,5 +53,12 @@ export async function toggleReaction(
     emoji,
   })
   if (error) return { ok: false, error: "Couldn't add reaction." }
+
+  // A 🔥 might approve a Prompt-of-the-Day submission → award the poster a fire
+  // (and maybe the crown). Evaluated lazily here; best-effort, never blocks.
+  if (emoji === FIRE_EMOJI) {
+    await evaluatePromptFire(postId)
+  }
+
   return { ok: true, reacted: true }
 }

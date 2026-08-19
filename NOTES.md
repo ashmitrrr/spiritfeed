@@ -3,6 +3,74 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Feature — Prompt of the Day (crown + fire streak) (done)
+
+The daily engagement loop. All state is **evaluated lazily on read** (feed
+render + the reaction action) — no new cron, per the Hobby-plan constraint.
+
+**State machine** (`lib/prompts.ts`, service-role): `getTodaysPrompt()` →
+live prompt if one exists; else the active (in-deadline) assignee → "awaiting";
+else picks a new assignee (excluding anyone already assigned today, fairness =
+null/oldest `last_prompt_master_date`, random among the top group), 4h deadline;
+if everyone's had+missed a slot → random `backup_prompts`, `is_backup=true`.
+`submitTodaysPrompt()` creates the `daily_prompts` row (24h window), marks the
+assignment fulfilled, sets `last_prompt_master_date`. `getPromptContext()`
+bundles state + roster + crown + "did I submit" for the page.
+
+**Approval / fire / crown** (`evaluatePromptFire()` from the reaction action,
+only on a 🔥 add): counts 🔥 on the post **excluding the author's own**, vs
+`ceil(total members / 2)`; on first crossing (idempotent via
+`prompt_last_fire_date`) awards the poster a fire — streak +1 if their last fire
+was the day before, else reset to 1 — and at streak ≥ 3 upserts `spirit_crown`
+(dethroning the previous holder). **Inaction reset** is folded into prompt
+creation: when a new prompt day is created, anyone who didn't fire on the
+previous prompt day has their streak zeroed.
+
+**Submission**: composer shows a "Submit as today's prompt 🔥" toggle only when a
+live prompt exists and the user hasn't submitted; the post actions attach
+`daily_prompt_id` after re-checking the window + one-submission-per-person.
+
+**UI**: `PromptCard` (pinned above composer) — live prompt + author + backup
+tag + ticking countdown + roster (approved/awaiting-fire/not-in); the assignee
+sees the write-prompt form, everyone else "waiting on X · Yh left". Post cards
+show "🔥 N/M fires needed" → "🔥 Prompt approved". `PixelCrown` SVG overlays the
+holder's avatar everywhere (header, feed, admin). Header shows the user's
+`🔥 N-day streak`.
+
+**⚠️ Fixed a latent bug in the earlier remove-user feature**: the new
+prompt tables add NO ACTION FKs to `profiles` (`daily_prompts.author_id`,
+`prompt_assignments.user_id`, `spirit_crown.holder_id`). `deleteUserCompletely`
+now vacates the crown, deletes their assignments, and **reassigns** any prompts
+they authored to a surviving member (prefer admin) — otherwise removing a user
+who'd been prompt master / crown holder would fail.
+
+**Verified live** (throwaway 4-user group + real fns via a temp debug route,
+since deleted): 20/20 checks — assignee pick + submit, below/at threshold award,
+author-self-🔥 excluded, idempotency, 3-day streak → crown → dethrone, and
+inaction reset (kept vs zeroed vs no-op). Snapshotted + restored the one real
+account (ash) and the crown; DB left pristine (1 profile, 0 prompt rows).
+
+### Judgment calls (flagged for Ashmit)
+- **Timezone**: "today" = **UTC** calendar day (deterministic; matches DB
+  `current_date`). One-line change in `promptDateToday()` if you want group-local.
+- **Threshold**: used the explicit `ceil(total/2)` from the spec. Note this
+  differs from "more than half" for even group sizes (8 → needs 4, not 5). Total
+  counts all members incl. the poster; the poster's own 🔥 is excluded from the
+  count. Say the word if you want strict >half.
+- **Fires aren't revoked**: once earned, un-reacting 🔥 below threshold doesn't
+  take the fire back (spec says "earns a fire", no revocation).
+- **Backup author**: `daily_prompts.author_id` is NOT NULL, so a backup prompt is
+  attributed to the most-recently-assigned member (no "system" author possible).
+- **Crown = pixel SVG** (`PixelCrown`), not an emoji — consistent with the
+  no-emoji-avatar direction. 🔥 *is* used for fire/streak counts since it's the
+  literal mechanic + already a reaction emoji.
+- **"waiting on …" shows display_name**, not username as the spec literally said —
+  matches how names appear everywhere else. Trivial to switch.
+- **Fire progress / crown update on next load**, not instantly on tap (reactions
+  are optimistic client-side and don't re-render the server feed).
+- **Feed render has side effects** (assignment/backup creation) — intentional,
+  that's the lazy trigger replacing a cron.
+
 ## Feature — ephemeral posts (24h expiry + daily reaper) (done)
 
 BeReal-style: regular posts vanish from the feed 24h after posting and are then

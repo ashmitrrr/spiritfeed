@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { getCurrentProfile } from "@/lib/auth/session"
+import { getCrownHolderId } from "@/lib/prompts"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { Avatar } from "../_components/Avatar"
@@ -23,19 +24,21 @@ export default async function AdminPage() {
   if (!profile.is_admin) redirect("/")
 
   const admin = createAdminClient()
-  const [{ data: invites }, { data: profiles }, baseUrl] = await Promise.all([
-    admin
-      .from("invites")
-      .select("token, created_at, used_at, used_by")
-      .order("created_at", { ascending: false }),
-    admin
-      .from("profiles")
-      .select(
-        "id, username, display_name, spirit_animal, animal_nickname, animal_adjective, is_admin",
-      )
-      .order("display_name"),
-    getBaseUrl(),
-  ])
+  const [{ data: invites }, { data: profiles }, baseUrl, crownHolderId] =
+    await Promise.all([
+      admin
+        .from("invites")
+        .select("token, created_at, used_at, used_by")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("profiles")
+        .select(
+          "id, username, display_name, spirit_animal, animal_nickname, animal_adjective, is_admin",
+        )
+        .order("display_name"),
+      getBaseUrl(),
+      getCrownHolderId(),
+    ])
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
   const members = profiles ?? []
@@ -75,7 +78,11 @@ export default async function AdminPage() {
                 key={member.id}
                 className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-2 border-ink bg-white px-3 py-2"
               >
-                <Avatar animalKey={member.spirit_animal} size="sm" />
+                <Avatar
+                    animalKey={member.spirit_animal}
+                    size="sm"
+                    crowned={crownHolderId === member.id}
+                  />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">
                     {member.display_name}
@@ -149,7 +156,11 @@ export default async function AdminPage() {
                   className="flex items-center gap-2.5 border-2 border-ink/40 bg-white px-3 py-2 text-sm"
                 >
                   {member ? (
-                    <Avatar animalKey={member.spirit_animal} size="sm" />
+                    <Avatar
+                    animalKey={member.spirit_animal}
+                    size="sm"
+                    crowned={crownHolderId === member.id}
+                  />
                   ) : null}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ink">
