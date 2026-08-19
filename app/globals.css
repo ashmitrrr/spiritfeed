@@ -1,12 +1,10 @@
 @import "tailwindcss";
 
 /* ─── SpiritFeed design tokens (pixel / retro-cozy — see DESIGN.md) ─────────
-   Palette sampled from the logo screenshot. Flagged to Ashmit: the exact olive
-   is a best-guess from the pasted screenshot — refine once the real logo file
-   is available to sample from. */
+   Palette sampled directly from the real Logo.png (background pixel #979265). */
 :root {
-  --olive: #8b8c63;
-  --olive-dark: #6f7049; /* overlays / deeper accents */
+  --olive: #979265;
+  --olive-dark: #76724f; /* overlays / deeper accents */
   --bone: #ece6d5; /* warm off-white — page + card surfaces */
   --bone-dim: #ddd6c1; /* subtle fills, disabled surfaces */
   --white: #ffffff;
