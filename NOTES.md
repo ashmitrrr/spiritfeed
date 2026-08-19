@@ -3,6 +3,60 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Phase 1 — Auth & onboarding (done)
+
+**Auth model**: invite-only username/password on top of Supabase Auth. Usernames
+map to synthetic, non-routable emails `<username>@spiritfeed.local` (never
+emailed). Verified live that Supabase accepts these + password sign-in works.
+Usernames: lowercase `[a-z0-9_]`, 3–20 chars, case-insensitive for login.
+`display_name` keeps the original casing the user typed. Password min 8.
+
+**Service-role usage**: RLS forbids the anon key from the onboarding writes, so
+all privileged steps run server-side via `lib/supabase/admin.ts` (guarded by
+`server-only`). `lib/auth/onboarding.ts#createAccount()` does the whole flow
+(validate → create auth user → insert profile → atomically claim animal → mark
+invite used) with best-effort rollback/cleanup if a later step fails. Animal
+claim + invite-use are conditional updates (`.is(..., null)`) so a race can't
+double-assign — negligible at this scale but correct.
+
+**Bootstrap `/setup`**: solves the chicken-and-egg problem (invites.created_by
+is NOT NULL → profiles.id, so the first admin can't come via an invite). It
+creates the first account as `is_admin = true` with no invite, and **only works
+while the profiles table is empty** — it redirects to /login once any profile
+exists, so it disables itself after first use. Forced `dynamic = "force-dynamic"`
+so the emptiness check isn't statically cached. **➡️ Ashmit: run `/setup` first
+to claim your admin account + spirit animal.**
+
+**Routes added**: `/setup`, `/login`, `/join/[token]` (all under an `(auth)`
+route group with a shared centered layout), `/admin` (invite gen + list,
+admin-only), `POST /auth/signout`, and `/` rewritten as the authed home shell.
+
+**Auth gating** lives in `proxy.ts` → `lib/supabase/middleware.ts`: no session +
+private path → `/login`; session + guest-only path (`/login`,`/join`,`/setup`) →
+`/`. Public paths are the auth screens + `/auth/*`.
+
+**Spirit animals**: 28 seeded; built against **emoji placeholders**
+(`lib/spirit-animals.ts`, keyed by animal `key`) per Ashmit's call — real art
+(`icon_url` → `/animals/{key}.svg`) swaps in later. A few animals (capybara,
+meerkat, narwhal, platypus, red panda, hummingbird, lynx) use approximate emoji.
+The picker grays out taken animals with the current holder's name and requires a
+"this is forever" confirm step before submit.
+
+**Verified**: `npm run build` + `npm run lint` clean; live GET smoke tests pass
+(`/`→redirect `/login`, `/login`, `/setup` renders form+grid, `/join/<bad>` shows
+friendly invalid message, `/admin`→redirect when signed out); synthetic-email
+create/sign-in/delete verified against the real project and cleaned up. DB left
+pristine (0 users / 0 profiles / 0 animals taken / 0 invites).
+
+**Deferred / notes for later**:
+- No "forgot password" flow (by design — reset via Supabase dashboard).
+- Spirit-animal immutability is enforced in app logic only (no DB trigger yet),
+  matching DATABASE_SCHEMA.md's "belt-and-suspenders later" note.
+- `/admin` is intentionally basic (Phase 1 scope); no expiry set on generated
+  invites yet (expires_at left null = never expires). Easy to add later.
+- Invite links are shown as absolute URLs built from request headers; when
+  deployed, they'll use the Vercel host automatically.
+
 ## Phase 0 — Project setup (done)
 
 **Stack as scaffolded**
