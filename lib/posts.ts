@@ -36,11 +36,20 @@ function firstAuthor(value: AuthorEmbed | AuthorEmbed[]): AuthorEmbed {
   return Array.isArray(value) ? (value[0] ?? null) : value
 }
 
+// Posts are ephemeral (BeReal-style): a regular post vanishes from the feed 24h
+// after it was posted. Time capsules are exempt — they follow their own
+// unlock_at gating instead.
+export const POST_TTL_MS = 24 * 60 * 60 * 1000
+
 /**
- * Loads the reverse-chronological feed for the signed-in user: all posts whose
- * time capsule (if any) has unlocked, with author info, signed photo URLs, and
- * reaction tallies including which emojis the current user has used.
- * Returns [] if there's no session.
+ * Loads the reverse-chronological feed for the signed-in user. Visibility:
+ *   - regular posts (is_time_capsule = false): shown only while < 24h old
+ *   - time capsules (is_time_capsule = true): shown once unlock_at has passed
+ * Includes author info, signed photo URLs, and reaction tallies (with which
+ * emojis the current user has used). Returns [] if there's no session.
+ *
+ * The 24h cutoff here is instant: a post disappears the moment it crosses 24h,
+ * independent of when the daily reaper job (which permanently deletes it) runs.
  */
 export async function getFeed(): Promise<FeedPost[]> {
   const supabase = await createClient()
@@ -50,13 +59,16 @@ export async function getFeed(): Promise<FeedPost[]> {
   if (!user) return []
 
   const nowIso = new Date().toISOString()
+  const cutoffIso = new Date(Date.now() - POST_TTL_MS).toISOString()
 
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
       "id, author_id, caption, photo_path, post_type, created_at, is_time_capsule, unlock_at, author:profiles!posts_author_id_fkey(display_name, spirit_animal, animal_nickname, animal_adjective)",
     )
-    .or(`is_time_capsule.eq.false,unlock_at.lte.${nowIso}`)
+    .or(
+      `and(is_time_capsule.eq.false,created_at.gt.${cutoffIso}),and(is_time_capsule.eq.true,unlock_at.lte.${nowIso})`,
+    )
     .order("created_at", { ascending: false })
     .limit(100)
 

@@ -5,13 +5,16 @@ import { createServerClient } from "@supabase/ssr"
 import type { Database } from "@/lib/database.types"
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env"
 
-/** Paths reachable without a session (auth screens + auth endpoints). */
+/** Paths reachable without a session (auth screens + auth/API endpoints). */
 function isPublicPath(pathname: string): boolean {
   return (
     pathname.startsWith("/login") ||
     pathname.startsWith("/join") ||
     pathname.startsWith("/setup") ||
-    pathname.startsWith("/auth")
+    pathname.startsWith("/auth") ||
+    // API routes do their own auth (e.g. the cron reaper checks CRON_SECRET);
+    // they must not be redirected to the HTML login page.
+    pathname.startsWith("/api")
   )
 }
 

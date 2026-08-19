@@ -3,6 +3,57 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Feature — ephemeral posts (24h expiry + daily reaper) (done)
+
+BeReal-style: regular posts vanish from the feed 24h after posting and are then
+permanently deleted (archived first). Time capsules are exempt — untouched
+unlock_at gating.
+
+**1. Feed filter (instant, no cron dependency)** — `lib/posts.ts` `getFeed()`:
+`.or(and(is_time_capsule.eq.false,created_at.gt.CUTOFF),and(is_time_capsule.eq.true,unlock_at.lte.NOW))`
+where CUTOFF = now − 24h (`POST_TTL_MS`). A post disappears the instant it
+crosses 24h regardless of when the reaper last ran. Capsule logic unchanged.
+
+**2. Daily reaper** — `lib/reaper.ts` `reapExpiredPosts()` (service-role) +
+`app/api/cron/reap-posts/route.ts` (GET) + `vercel.json` cron `0 3 * * *`
+(daily; Hobby-plan ±59min timing is fine). For each non-capsule post ≥24h old:
+counts reactions → inserts a `post_archive` row (`original_post_id`, `author_id`,
+`post_type`, `caption`, `reaction_count`, `posted_at` = original `created_at`,
+`is_top_of_day`); the single highest-reaction post (ties → earliest
+`created_at`) is marked `is_top_of_day` and **only its** photo is copied to a
+permanent `archive/{id}.{ext}` path; then all originals' photos are removed from
+storage and the `posts` rows deleted (reactions cascade).
+
+**3. Auth** — route checks `Authorization: Bearer ${CRON_SECRET}` (Vercel Cron
+sends this automatically when the env var is set); fails closed if unset.
+`lib/supabase/middleware.ts` now treats `/api/*` as public (API routes do their
+own auth) so the cron isn't redirected to `/login`.
+
+**4. CRON_SECRET** — generated (openssl 32-byte hex) and added to `.env.local`.
+**➡️ Ashmit: add `CRON_SECRET` (same value) to the Vercel project env vars**
+before the prod cron will work. (Vercel injects it into the cron request.)
+
+**5. Composer/UI** — no changes; posting is identical, posts just stop appearing
+after 24h.
+
+**Verified schema facts** (queried live): `posts.created_at` is NOT NULL (DB
+default now() applies only to single-row inserts that omit it — bulk inserts send
+explicit NULL; the app always single-inserts so it's fine); `reactions.post_id`
+CASCADE; `post_archive.author_id → profiles` is **SET NULL**, so archived rows
+survive a user deletion (no change needed to the delete-user helper).
+
+**How tested without waiting 24h**: a throwaway script seeded posts with a
+**backdated `created_at` (25h ago)** — 3 expiring (reaction counts 2/5/0, the
+"5" one with a photo), 1 backdated time capsule, 1 fresh post — then hit the real
+route over HTTP. **19/19 checks pass**: 401 without/with-wrong secret, reaped=3,
+top-of-day = the 5-reaction post, 3 archive rows with correct counts +
+`posted_at` + only-top `is_top_of_day`, top photo copied to `archive/…` and
+originals removed, capsule + fresh post survived, reactions cascaded, idempotent
+2nd run reaps 0. Test user + data fully cleaned up; only the real account (ash)
+remains. Also removed 2 orphaned storage objects left by earlier test runs — the
+`photos` bucket now holds only real data. To trigger manually against a deployed
+env: `curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/cron/reap-posts`.
+
 ## Pre-deploy — storage cleanup, admin delete-user, @mentions (done)
 
 **1. Storage cleanup (one-off)**: removed the 2 orphaned photo objects left by

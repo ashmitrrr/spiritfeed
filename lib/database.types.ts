@@ -7,13 +7,64 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
+      backup_prompts: {
+        Row: {
+          id: string
+          prompt_text: string
+        }
+        Insert: {
+          id?: string
+          prompt_text: string
+        }
+        Update: {
+          id?: string
+          prompt_text?: string
+        }
+        Relationships: []
+      }
+      daily_prompts: {
+        Row: {
+          author_id: string
+          id: string
+          is_backup: boolean
+          posted_at: string
+          prompt_date: string
+          prompt_text: string
+          window_ends_at: string
+        }
+        Insert: {
+          author_id: string
+          id?: string
+          is_backup?: boolean
+          posted_at?: string
+          prompt_date: string
+          prompt_text: string
+          window_ends_at: string
+        }
+        Update: {
+          author_id?: string
+          id?: string
+          is_backup?: boolean
+          posted_at?: string
+          prompt_date?: string
+          prompt_text?: string
+          window_ends_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_prompts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           created_at: string
@@ -59,11 +110,59 @@ export type Database = {
           },
         ]
       }
+      post_archive: {
+        Row: {
+          archived_at: string
+          author_id: string | null
+          caption: string | null
+          id: string
+          is_top_of_day: boolean
+          original_post_id: string
+          photo_path: string | null
+          post_type: string
+          posted_at: string
+          reaction_count: number
+        }
+        Insert: {
+          archived_at?: string
+          author_id?: string | null
+          caption?: string | null
+          id?: string
+          is_top_of_day?: boolean
+          original_post_id: string
+          photo_path?: string | null
+          post_type: string
+          posted_at: string
+          reaction_count?: number
+        }
+        Update: {
+          archived_at?: string
+          author_id?: string | null
+          caption?: string | null
+          id?: string
+          is_top_of_day?: boolean
+          original_post_id?: string
+          photo_path?: string | null
+          post_type?: string
+          posted_at?: string
+          reaction_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_archive_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           author_id: string
           caption: string | null
           created_at: string
+          daily_prompt_id: string | null
           id: string
           is_time_capsule: boolean
           photo_path: string | null
@@ -74,6 +173,7 @@ export type Database = {
           author_id: string
           caption?: string | null
           created_at?: string
+          daily_prompt_id?: string | null
           id?: string
           is_time_capsule?: boolean
           photo_path?: string | null
@@ -84,6 +184,7 @@ export type Database = {
           author_id?: string
           caption?: string | null
           created_at?: string
+          daily_prompt_id?: string | null
           id?: string
           is_time_capsule?: boolean
           photo_path?: string | null
@@ -98,6 +199,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "posts_daily_prompt_id_fkey"
+            columns: ["daily_prompt_id"]
+            isOneToOne: false
+            referencedRelation: "daily_prompts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -108,6 +216,9 @@ export type Database = {
           display_name: string
           id: string
           is_admin: boolean
+          last_prompt_master_date: string | null
+          prompt_fire_streak: number
+          prompt_last_fire_date: string | null
           spirit_animal: string
           username: string
         }
@@ -118,6 +229,9 @@ export type Database = {
           display_name: string
           id: string
           is_admin?: boolean
+          last_prompt_master_date?: string | null
+          prompt_fire_streak?: number
+          prompt_last_fire_date?: string | null
           spirit_animal: string
           username: string
         }
@@ -128,6 +242,9 @@ export type Database = {
           display_name?: string
           id?: string
           is_admin?: boolean
+          last_prompt_master_date?: string | null
+          prompt_fire_streak?: number
+          prompt_last_fire_date?: string | null
           spirit_animal?: string
           username?: string
         }
@@ -138,6 +255,41 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "spirit_animals"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      prompt_assignments: {
+        Row: {
+          assigned_at: string
+          deadline_at: string
+          fulfilled: boolean
+          id: string
+          prompt_date: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          deadline_at: string
+          fulfilled?: boolean
+          id?: string
+          prompt_date: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          deadline_at?: string
+          fulfilled?: boolean
+          id?: string
+          prompt_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -235,6 +387,32 @@ export type Database = {
           {
             foreignKeyName: "spirit_animals_taken_by_fkey"
             columns: ["taken_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spirit_crown: {
+        Row: {
+          achieved_at: string | null
+          holder_id: string | null
+          id: number
+        }
+        Insert: {
+          achieved_at?: string | null
+          holder_id?: string | null
+          id?: number
+        }
+        Update: {
+          achieved_at?: string | null
+          holder_id?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spirit_crown_holder_id_fkey"
+            columns: ["holder_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
