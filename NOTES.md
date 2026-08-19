@@ -3,6 +3,51 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Pre-deploy — storage cleanup, admin delete-user, @mentions (done)
+
+**1. Storage cleanup (one-off)**: removed the 2 orphaned photo objects left by
+deleted test accounts via a throwaway service-role script; confirmed the
+`photos` bucket is now **empty**. Script was run then deleted — no permanent
+tooling added.
+
+**2. Admin "Remove user"** (`lib/auth/admin-users.ts` `deleteUserCompletely`,
+`removeUserAction` in `app/admin/actions.ts`, `RemoveUserButton.tsx`, Members
+section on the admin page). Built against the **verified live FK behavior**, not
+assumptions:
+- `profiles.id → auth.users` is CASCADE, so `deleteUser()` removes the profile.
+  `posts/reactions/statuses/streaks → profiles` are CASCADE too.
+- **`spirit_animals.taken_by → profiles` is NO ACTION, NOT set-null** — so the
+  animal is freed explicitly (else the delete fails and the animal stays locked).
+- Other NO ACTION referrers that would block the profile delete are cleared
+  first: `invites.created_by`/`used_by` (deleted — created_by is NOT NULL so
+  can't null it), `setup_lock.claimed_by` (nulled, **never** delete the row or
+  /setup re-opens), `weekly_recaps.most_active_user_id`/`top_post_id` (nulled).
+- Post photos are removed from storage before the rows go.
+- **Guards**: admin-only; can't remove your own account (friendly message; own
+  row shows "You" instead of a button). **Type-to-confirm** UI (must type the
+  exact username) — no single-click deletes.
+- **Verified end-to-end** against the live project: a throwaway fully-wired user
+  (animal claim, invites created+used by them, post+photo, reaction, status,
+  streak) was torn down — 10/10 checks pass (deleteUser no FK block, profile
+  cascaded, animal freed, photos/invites gone, counts back to baseline). Test
+  user created + cleaned up; no real data touched. (Baseline is currently 0
+  profiles — the earlier test accounts have since been cleared.)
+
+**3. @mentions** (`lib/mentions.ts` pure parser + `lib/mentions-server.ts`
+`getMentionableUsers`, `MentionInput.tsx`, `RichText.tsx`, `.pixel-tag` in
+globals). Composer caption + status now use `MentionInput`: typing `@` opens a
+lightweight dropdown filtered client-side over the full (~15-20) user list
+(fetched server-side in `page.tsx`, authenticated client); pick with
+click/Enter/Tab, arrow-key nav, Esc to dismiss — inserts `@username `. In the
+feed, `RichText` renders `@username` patterns as pixel tags (visual only — no
+links, no notifications, none exists yet). `CAPTION_MAX` (280) / `STATUS_MAX`
+(100) unchanged; the `@username` text counts toward the cap like any character
+(enforced by `maxLength` + a manual cap on programmatic insertion).
+
+**Verified**: `npm run lint` + `npm run build` clean. **Ready for Vercel** once
+reviewed — remember to set `NEXT_PUBLIC_SUPABASE_*` + `SUPABASE_SERVICE_ROLE_KEY`
+in the Vercel project env.
+
 ## Phase — Spirit animal personality system (done)
 
 Replaced emoji spirit-animals with real pixel-art portraits and added a
