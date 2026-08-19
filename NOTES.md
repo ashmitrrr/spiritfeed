@@ -3,6 +3,115 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Feature — Realtime feed + push notifications (done)
+
+Two features: live feed refresh over Supabase Realtime, and browser push
+notifications (Web Push / VAPID).
+
+### Part A — Realtime
+`app/_components/RealtimeRefresh.tsx` (client, mounted once in `app/page.tsx`)
+opens **one** Supabase Realtime channel subscribed to `postgres_changes`
+(INSERT/UPDATE/DELETE) on `posts, reactions, daily_prompts, prompt_assignments,
+spirit_crown, statuses`. Any event → **debounced ~700ms** → `router.refresh()`.
+It deliberately does **not** patch feed state from the payload — the server
+(`getFeed()` / `getPromptContext()`) owns 24h expiry, time-capsule gating,
+signed photo URLs, reaction aggregation and the prompt state machine, so
+Realtime is purely a "something changed, refetch" nudge. Channel is torn down on
+unmount.
+
+**Infra I already applied** (migration `enable_realtime_on_feed_tables`): added
+those 6 tables to the `supabase_realtime` publication and set
+`REPLICA IDENTITY FULL` on each (so DELETE payloads carry the old row and RLS can
+evaluate them). All 6 already have `authenticated SELECT USING (true)`, so
+Realtime delivers their events to any signed-in member. ✅ No dashboard step
+needed — but if you ever add a new watched table, remember Realtime won't fire
+for it until it's added to that publication.
+
+### Part B — Push notifications
+- **VAPID keys**: generated with `npx web-push generate-vapid-keys`, added to
+  `.env.local` as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (public) + `VAPID_PRIVATE_KEY`
+  (server-only). Documented in the new `.env.example`. **➡️ Ashmit: add BOTH to
+  the Vercel project env vars** (same as `SUPABASE_SERVICE_ROLE_KEY` /
+  `CRON_SECRET`) before prod push works.
+- **`push_subscriptions` table** (migration `push_subscriptions`): `id, user_id →
+  profiles on delete cascade, endpoint unique, p256dh, auth, created_at`. RLS on:
+  authenticated users may only insert/delete rows where `user_id = auth.uid()`;
+  **no select policy** (endpoints/keys never leave the server; sends use the
+  service-role key). `lib/database.types.ts` regenerated.
+- **`public/sw.js`**: minimal service worker — `push` (parse `{title,body,url}`,
+  `showNotification`) + `notificationclick` (focus an existing tab on that URL,
+  else open one). No offline/caching.
+- **`public/manifest.json`** + linked via `metadata.manifest` in `layout.tsx`
+  (there was no manifest before). `display: standalone`, `start_url:/`, icons
+  from two new sizes generated off `app/icon.png` → `public/icon-192.png` /
+  `icon-512.png`. (Couldn't reuse `app/icon.png` directly: App Router already
+  serves it at `/icon.png`, so a `public/icon.png` would collide — hence the
+  separate sized files. `sw.js` uses `/icon-192.png`.)
+- **`NotificationToggle.tsx`** (header, next to Admin/Sign out): checks support +
+  `Notification.permission`, on enable requests permission → registers `/sw.js` →
+  `pushManager.subscribe({userVisibleOnly, applicationServerKey})` → POSTs to the
+  `savePushSubscription` server action. Toggling off unsubscribes + deletes the
+  row. Hidden entirely on unsupported browsers; shows "🔕 Blocked" if denied.
+- **`lib/push.ts`**: `sendPushToUser(userId, {title,body,url})` — loads the
+  user's subscriptions (service role), sends to each, **prunes any that fail with
+  404/410** (expired/gone). Best-effort: wrapped so it **never throws into the
+  caller**, same contract as `evaluatePromptFire`. Also exports
+  `pushAfterResponse(fn)` which runs the send via Next's `after()` (falls back to
+  fire-and-forget) so **a slow/failed push never delays the user-facing action**.
+- **Wired in** (all after the DB write, all fire-and-forget via
+  `pushAfterResponse`):
+  - `lib/prompts.ts` `getTodaysPrompt` — new assignment created → "it's your turn".
+  - `lib/prompts.ts` `createDailyPrompt` — prompt goes live → notify all members
+    except the author.
+  - `app/_actions/reactions.ts` — new reaction → notify the post's author.
+  - `lib/prompts.ts` `evaluatePromptFire` — crown newly changes hands → notify the
+    new holder.
+  - **New posts deliberately do NOT notify** (highest spam risk for a small
+    group) — noted with a comment in `app/_actions/posts.ts` as a possible opt-in
+    fast-follow, not built now.
+
+### Judgment calls (flagged for Ashmit)
+- **Reaction notify = once per reactor per post**: a push fires only on a
+  reactor's *first* reaction to a given post (any emoji), not per emoji tap, so a
+  popular post doesn't spam its author. Self-reactions never notify. Say the word
+  if you'd rather notify on every reaction or only on 🔥.
+- **Subscription upsert uses the service-role client** (in `savePushSubscription`),
+  not the RLS'd authenticated client. The endpoint is UNIQUE and upsert's UPDATE
+  branch must be able to re-own an endpoint if the same browser signs in as a
+  different account — an RLS `USING (user_id = auth.uid())` check would block that
+  transfer. The action still authenticates the user first and stamps
+  `user_id = auth.uid()`. The RLS insert/delete policies remain for any direct
+  client access.
+- **Push copy** (titles/bodies) is placeholder-ish and hard-coded in the wiring
+  points — easy to reword. Prompt "live" push uses the prompt text as the body.
+- **`after()` for delivery**: pushes run after the response is flushed (via
+  `next/server`'s `after`) rather than being truly detached, so they still
+  complete on Vercel (unawaited promises can be killed when the function
+  returns). This adds zero latency to the user action but does keep the function
+  alive briefly to send.
+
+### Verified
+- `npm run lint` + `npm run build` clean.
+- **DB**: `push_subscriptions` exists with RLS on + 2 policies; 6 tables in the
+  `supabase_realtime` publication. Confirmed via SQL.
+- **Push send + prune, end-to-end against the real push service**: a throwaway
+  user + a subscription with valid ECDH receiver keys but an invalid FCM endpoint
+  → `web-push` reported **410 Gone** → the row was pruned → 0 rows left. Cleaned
+  up the throwaway user; DB back to 1 real profile (ash), 0 push rows. This
+  exercises the exact send/statusCode/prune logic `sendPushToUser` uses.
+- **⚠️ NOT verifiable from this CLI env (need a real browser — Ashmit to check):**
+  1. **Realtime two-session test**: sign in as two users in two browsers (or one
+     incognito); a post/reaction/prompt action in one should refresh the other's
+     feed within ~1-2s with no manual reload.
+  2. **Real push receipt on desktop Chrome/Edge**: click "🔔 Notify me", allow,
+     then trigger a notifying event (e.g. have someone react to your post, or set
+     a prompt) and confirm the OS notification appears and clicking it focuses the
+     app.
+  3. **iOS Safari push**: only works when the app is **installed to the Home
+     Screen** as a PWA (bare Safari tabs can't receive Web Push on iOS) — that's
+     the main reason the manifest was added. Verify by Add to Home Screen →
+     open → enable notifications. Could not be tested here.
+
 ## Feature — Prompt of the Day (crown + fire streak) (done)
 
 The daily engagement loop. All state is **evaluated lazily on read** (feed

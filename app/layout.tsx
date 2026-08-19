@@ -20,6 +20,12 @@ const silkscreen = Silkscreen({
 export const metadata: Metadata = {
   title: "SpiritFeed",
   description: "A tiny, private clubhouse for the group. Pick your spirit animal.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "SpiritFeed",
+    statusBarStyle: "default",
+  },
 }
 
 export const viewport: Viewport = {

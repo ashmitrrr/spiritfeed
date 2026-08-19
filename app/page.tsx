@@ -8,8 +8,10 @@ import { getPromptContext } from "@/lib/prompts"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { Avatar } from "./_components/Avatar"
 import { Composer } from "./_components/Composer"
+import { NotificationToggle } from "./_components/NotificationToggle"
 import { PostCard } from "./_components/PostCard"
 import { PromptCard } from "./_components/PromptCard"
+import { RealtimeRefresh } from "./_components/RealtimeRefresh"
 import { SignOutButton } from "./_components/SignOutButton"
 
 // The feed re-reads posts on each request (reactions/photos change often).
@@ -62,6 +64,7 @@ export default async function Home() {
           spiritfeed
         </span>
         <div className="flex items-center gap-4">
+          <NotificationToggle />
           {profile.is_admin && (
             <Link
               href="/admin"
@@ -73,6 +76,8 @@ export default async function Home() {
           <SignOutButton />
         </div>
       </header>
+
+      <RealtimeRefresh />
 
       <PromptCard
         state={prompt.state}

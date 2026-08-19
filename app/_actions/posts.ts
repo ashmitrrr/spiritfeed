@@ -65,6 +65,11 @@ async function resolvePromptSubmission(
   return { ok: true, dailyPromptId: promptId }
 }
 
+// NOTE: we deliberately do NOT send a push notification for every new post
+// (photo/status) in v1 — for a 15-20 person group that's the highest-spam-risk
+// notification. Realtime already updates open feeds live. A possible fast-follow
+// is an opt-in "notify me about new posts" preference; left out on purpose here.
+
 /** Create a photo post: upload the (already client-compressed) image, then row. */
 export async function createPhotoPost(
   formData: FormData,

@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
+import { pushAfterResponse, sendPushToUser } from "@/lib/push"
 import {
   ASSIGN_WINDOW_MS,
   PROMPT_TEXT_MAX,
@@ -158,6 +159,24 @@ async function createDailyPrompt(
   // New prompt day → settle the previous day's streaks (winner only).
   await resetStreaksBrokenByInaction(admin, args.date)
   void data
+
+  // The prompt is now live → notify everyone except its author.
+  pushAfterResponse(async () => {
+    const { data: members } = await admin
+      .from("profiles")
+      .select("id")
+      .neq("id", args.authorId)
+    await Promise.all(
+      (members ?? []).map((m) =>
+        sendPushToUser(m.id, {
+          title: "Today's prompt is live 🔥",
+          body: args.text,
+          url: "/",
+        }),
+      ),
+    )
+  })
+
   return loadLivePrompt(admin, args.date)
 }
 
@@ -234,6 +253,15 @@ export async function getTodaysPrompt(depth = 0): Promise<TodaysPrompt> {
     if (error) {
       // Race (someone got assigned concurrently) — re-resolve once or twice.
       if (depth < 3) return getTodaysPrompt(depth + 1)
+    } else {
+      // Freshly assigned → tell them it's their turn (4h window).
+      pushAfterResponse(async () => {
+        await sendPushToUser(pick.id, {
+          title: "Your turn to set the prompt 🖊️",
+          body: "You've been picked as today's prompt master. You have 4 hours!",
+          url: "/",
+        })
+      })
     }
     return {
       status: "awaiting",
@@ -438,9 +466,24 @@ export async function evaluatePromptFire(postId: string): Promise<void> {
       .eq("id", poster.id)
 
     if (newStreak >= 3) {
+      const { data: crown } = await admin
+        .from("spirit_crown")
+        .select("holder_id")
+        .eq("id", 1)
+        .maybeSingle()
+      const isNewHolder = crown?.holder_id !== poster.id
       await admin
         .from("spirit_crown")
         .upsert({ id: 1, holder_id: poster.id, achieved_at: new Date().toISOString() })
+      if (isNewHolder) {
+        pushAfterResponse(async () => {
+          await sendPushToUser(poster.id, {
+            title: "You won the crown 👑",
+            body: "Three prompt days in a row — you're the reigning SpiritFeed champ.",
+            url: "/",
+          })
+        })
+      }
     }
   } catch {
     // Never let prompt bookkeeping break the reaction itself.
