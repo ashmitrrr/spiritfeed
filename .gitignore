@@ -13,6 +13,10 @@ out/
 # Supabase local dev
 .supabase/
 
+# TypeScript / Next
+*.tsbuildinfo
+next-env.d.ts
+
 # Misc
 .DS_Store
 *.log
