@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { getCurrentProfile } from "@/lib/auth/session"
+import { getMentionableUsers } from "@/lib/mentions-server"
 import { getFeed } from "@/lib/posts"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { Avatar } from "./_components/Avatar"
@@ -16,7 +17,10 @@ export default async function Home() {
   const profile = await getCurrentProfile()
   if (!profile) redirect("/login")
 
-  const posts = await getFeed()
+  const [posts, mentionables] = await Promise.all([
+    getFeed(),
+    getMentionableUsers(),
+  ])
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-4 py-6">
@@ -53,7 +57,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <Composer />
+      <Composer mentionables={mentionables} />
 
       {posts.length === 0 ? (
         <div className="border-2 border-dashed border-ink/30 px-4 py-12 text-center">

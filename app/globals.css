@@ -144,6 +144,19 @@
     color: var(--white);
   }
 
+  /* ── Inline @mention tag (non-interactive, matches the chip look) ───── */
+  .pixel-tag {
+    display: inline-block;
+    border: 2px solid var(--ink);
+    background: var(--olive);
+    color: var(--white);
+    padding: 0 0.25rem;
+    font-size: 0.85em;
+    line-height: 1.25;
+    white-space: nowrap;
+    vertical-align: baseline;
+  }
+
   /* ── Inline error / alert ───────────────────────────────────────────── */
   .pixel-alert {
     background: var(--white);

@@ -3,6 +3,7 @@ import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { relativeTime } from "@/lib/time"
 import { Avatar } from "./Avatar"
 import { ReactionBar } from "./ReactionBar"
+import { RichText } from "./RichText"
 
 export function PostCard({ post }: { post: FeedPost }) {
   const tagline = spiritAnimalTagline(
@@ -24,9 +25,10 @@ export function PostCard({ post }: { post: FeedPost }) {
       </header>
 
       {post.postType === "status" ? (
-        <p className="whitespace-pre-wrap break-words px-1 text-[15px]">
-          {post.caption}
-        </p>
+        <RichText
+          text={post.caption ?? ""}
+          className="whitespace-pre-wrap break-words px-1 text-[15px]"
+        />
       ) : (
         <>
           {post.photoUrl ? (
@@ -42,9 +44,10 @@ export function PostCard({ post }: { post: FeedPost }) {
             </div>
           )}
           {post.caption && (
-            <p className="whitespace-pre-wrap break-words px-1 text-sm">
-              {post.caption}
-            </p>
+            <RichText
+              text={post.caption}
+              className="whitespace-pre-wrap break-words px-1 text-sm"
+            />
           )}
         </>
       )}

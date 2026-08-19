@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { Avatar } from "../_components/Avatar"
 import { CopyButton } from "./_components/CopyButton"
+import { RemoveUserButton } from "./_components/RemoveUserButton"
 import { generateInviteAction } from "./actions"
 
 async function getBaseUrl(): Promise<string> {
@@ -30,19 +31,21 @@ export default async function AdminPage() {
     admin
       .from("profiles")
       .select(
-        "id, display_name, spirit_animal, animal_nickname, animal_adjective",
-      ),
+        "id, username, display_name, spirit_animal, animal_nickname, animal_adjective, is_admin",
+      )
+      .order("display_name"),
     getBaseUrl(),
   ])
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+  const members = profiles ?? []
   const pending = (invites ?? []).filter((i) => !i.used_at)
   const used = (invites ?? []).filter((i) => i.used_at)
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 space-y-8 px-5 py-8">
       <header className="flex items-center justify-between">
-        <h1 className="font-display text-lg tracking-tight">Admin · Invites</h1>
+        <h1 className="font-display text-lg tracking-tight">Admin</h1>
         <Link
           href="/"
           className="text-sm text-ink/60 underline underline-offset-4 hover:text-ink"
@@ -59,6 +62,48 @@ export default async function AdminPage() {
           Generate new invite link
         </button>
       </form>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-ink/70">
+          Members ({members.length})
+        </h2>
+        <ul className="space-y-2">
+          {members.map((member) => {
+            const isSelf = member.id === profile.id
+            return (
+              <li
+                key={member.id}
+                className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-2 border-ink bg-white px-3 py-2"
+              >
+                <Avatar animalKey={member.spirit_animal} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">
+                    {member.display_name}
+                    {member.is_admin && (
+                      <span className="ml-1.5 text-xs text-ink/40">admin</span>
+                    )}
+                  </p>
+                  <p className="truncate text-xs text-olive-dark">
+                    {spiritAnimalTagline(
+                      member.spirit_animal,
+                      member.animal_nickname,
+                      member.animal_adjective,
+                    )}
+                  </p>
+                </div>
+                {isSelf ? (
+                  <span className="shrink-0 text-xs text-ink/40">You</span>
+                ) : (
+                  <RemoveUserButton
+                    targetId={member.id}
+                    username={member.username}
+                  />
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-ink/70">

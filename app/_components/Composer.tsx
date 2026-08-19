@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
 import { compressImage, ImageDecodeError } from "@/lib/image"
+import type { Mentionable } from "@/lib/mentions"
 import {
   CAPTION_MAX,
   MAX_ORIGINAL_BYTES,
@@ -12,10 +13,11 @@ import {
   humanBytes,
 } from "@/lib/upload-limits"
 import { createPhotoPost, createStatusPost } from "@/app/_actions/posts"
+import { MentionInput } from "./MentionInput"
 
 type Mode = "photo" | "status"
 
-export function Composer() {
+export function Composer({ mentionables }: { mentionables: Mentionable[] }) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>("photo")
   const [isPending, startTransition] = useTransition()
@@ -168,12 +170,13 @@ export function Composer() {
             </button>
           )}
 
-          <input
-            type="text"
+          <MentionInput
             value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            onChange={setCaption}
+            mentionables={mentionables}
             maxLength={CAPTION_MAX}
             placeholder="Add a caption (optional)"
+            aria-label="Caption"
             className="pixel-input px-3 py-2 text-sm"
           />
 
@@ -188,12 +191,15 @@ export function Composer() {
         </div>
       ) : (
         <div className="space-y-3">
-          <textarea
+          <MentionInput
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            maxLength={STATUS_MAX}
+            onChange={setStatus}
+            mentionables={mentionables}
+            multiline
             rows={2}
+            maxLength={STATUS_MAX}
             placeholder="What's your status?"
+            aria-label="Status"
             className="pixel-input resize-none px-3 py-2 text-sm"
           />
           <div className="flex items-center justify-between">
