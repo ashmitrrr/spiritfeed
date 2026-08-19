@@ -18,7 +18,10 @@ export type CreateAccountParams = {
   inviteToken?: string
   /**
    * Safety guard for the /setup bootstrap: only proceed if the profiles table
-   * is still empty. Prevents a second person racing into the bootstrap route.
+   * is still empty. Enforced twice: a fast pre-check here for a quick error
+   * message, and an atomic single-row lock claim (`setup_lock`) right before
+   * account creation, which is what actually prevents two simultaneous
+   * /setup submissions from both becoming admins.
    */
   requireNoExistingProfiles?: boolean
 }
@@ -31,14 +34,16 @@ export type CreateAccountResult =
  * Creates a SpiritFeed account end to end using the service-role client
  * (RLS intentionally forbids the anon key from doing these steps):
  *   1. validate inputs + preconditions (animal free, username free, invite valid)
- *   2. create the auth user
- *   3. insert the profile
- *   4. atomically claim the spirit animal (taken_by)
- *   5. mark the invite used (if this is an invite signup)
+ *   2. claim the bootstrap lock, if this is a /setup signup (atomic mutex)
+ *   3. create the auth user
+ *   4. insert the profile
+ *   5. atomically claim the spirit animal (taken_by)
+ *   6. mark the invite used (if this is an invite signup)
  *
- * On any failure after the auth user is created, best-effort cleanup runs so we
- * don't leave orphaned users/rows. It does NOT establish a session — the caller
- * signs the user in with the cookie-based client afterwards.
+ * On any failure after the lock/auth user are created, best-effort cleanup
+ * runs so we don't leave orphaned users/rows or a stuck lock. It does NOT
+ * establish a session — the caller signs the user in with the cookie-based
+ * client afterwards.
  */
 export async function createAccount(
   params: CreateAccountParams,
@@ -57,7 +62,8 @@ export async function createAccount(
   if (passwordError) return { ok: false, error: passwordError }
   if (!animalKey) return { ok: false, error: "Please pick a spirit animal." }
 
-  // 1a. Bootstrap guard: only when profiles table is empty
+  // 1a. Bootstrap fast pre-check (not itself race-safe — see the atomic lock
+  // claim below, which is what actually prevents a double-admin race).
   if (params.requireNoExistingProfiles) {
     const { count, error } = await admin
       .from("profiles")
@@ -109,6 +115,31 @@ export async function createAccount(
     }
   }
 
+  // 4a. Bootstrap lock: the real race guard. `setup_lock` has exactly one
+  // allowed row (id = 1). If two /setup submissions land at the same time,
+  // Postgres's primary key constraint guarantees only one INSERT succeeds —
+  // the loser gets a unique-violation error here and bails out cleanly,
+  // instead of both becoming admins.
+  let lockClaimed = false
+  if (params.requireNoExistingProfiles) {
+    const { error: lockError } = await admin
+      .from("setup_lock")
+      .insert({ id: 1 })
+    if (lockError) {
+      return { ok: false, error: "Setup has already been completed." }
+    }
+    lockClaimed = true
+  }
+
+  const releaseLock = async () => {
+    if (lockClaimed) {
+      // Query builder calls resolve with { error } rather than throwing, so
+      // no try/catch needed — just await and ignore the result either way,
+      // this is best-effort cleanup.
+      await admin.from("setup_lock").delete().eq("id", 1)
+    }
+  }
+
   // 5. Create the auth user (synthetic email, pre-confirmed)
   const email = usernameToEmail(username)
   const { data: created, error: createError } =
@@ -119,6 +150,7 @@ export async function createAccount(
       user_metadata: { username, display_name: displayName },
     })
   if (createError || !created.user) {
+    await releaseLock()
     return {
       ok: false,
       error: createError?.message ?? "Couldn't create the account.",
@@ -128,6 +160,7 @@ export async function createAccount(
 
   const cleanup = async () => {
     await admin.auth.admin.deleteUser(userId).catch(() => {})
+    await releaseLock()
   }
 
   // 6. Insert the profile row
@@ -140,7 +173,18 @@ export async function createAccount(
   })
   if (profileError) {
     await cleanup()
-    return { ok: false, error: "Couldn't save your profile. Try again." }
+    // A unique-violation on username here means someone else's request won
+    // a genuine simultaneous-signup race (the earlier lookup only catches
+    // the non-racing case) — give a specific, actionable message for that.
+    const isUsernameConflict =
+      profileError.code === "23505" &&
+      profileError.message.toLowerCase().includes("username")
+    return {
+      ok: false,
+      error: isUsernameConflict
+        ? "That username was just taken. Try another."
+        : "Couldn't save your profile. Try again.",
+    }
   }
 
   // 7. Atomically claim the spirit animal (only if still free)
@@ -173,6 +217,12 @@ export async function createAccount(
       await cleanup()
       return { ok: false, error: "This invite is no longer valid." }
     }
+  }
+
+  // 9. Mark the lock as claimed by the winner (informational only — the row
+  // staying present forever is what keeps /setup disabled for good).
+  if (lockClaimed) {
+    await admin.from("setup_lock").update({ claimed_by: userId }).eq("id", 1)
   }
 
   return { ok: true, userId, email, username }

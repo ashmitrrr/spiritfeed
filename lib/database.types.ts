@@ -174,6 +174,32 @@ export type Database = {
           },
         ]
       }
+      setup_lock: {
+        Row: {
+          claimed_at: string
+          claimed_by: string | null
+          id: number
+        }
+        Insert: {
+          claimed_at?: string
+          claimed_by?: string | null
+          id?: number
+        }
+        Update: {
+          claimed_at?: string
+          claimed_by?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setup_lock_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spirit_animals: {
         Row: {
           icon_url: string

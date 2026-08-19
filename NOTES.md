@@ -3,6 +3,58 @@
 Running log of pragmatic decisions, placeholders, and things to flag to Ashmit.
 Newest phase at the top.
 
+## Phase 2 — Core posting & feed (done)
+
+The MVP core loop: post a photo, post a status, see the feed, react with emoji.
+Styling deliberately plain (design pass comes later).
+
+**Composer** (`app/_components/Composer.tsx`, inline at top of feed — simpler and
+more reliable than a modal for MVP): Photo/Status tabs.
+- Photo: file input (`accept="image/*"`, opens camera on mobile), preview,
+  optional caption. Compresses **client-side** (`lib/image.ts`, canvas →
+  downscale to 1600px max edge → JPEG q0.8) before upload.
+- Status: textarea, max 100 chars with counter.
+
+**Post creation** (`app/_actions/posts.ts`, service-role): photo posts upload the
+compressed blob to the private `photos` bucket at `{user_id}/{post_id}.{ext}`,
+then insert the `posts` row; on insert failure the orphaned upload is removed.
+Status posts insert `post_type='status'` with the text in `caption`. Both
+`revalidatePath('/')`.
+
+**Feed** (`lib/posts.ts` + `app/page.tsx`, `force-dynamic`): reverse-chron, reads
+posts + embedded author + reactions with the authenticated client (RLS allows),
+generates signed photo URLs (1h TTL) with the service-role client. Already
+filters out locked time capsules (`is_time_capsule=false OR unlock_at<=now`) so
+Phase 5 needs no feed change. Reaction tallies + which emojis the current user
+used are computed per post.
+
+**Reactions** (`app/_actions/reactions.ts` + `ReactionBar.tsx`): fixed set
+🔥❤️😂😮👀, tap to toggle, optimistic client update with revert on failure. Toggle
+uses the **authenticated** client so RLS enforces `user_id = auth.uid()` (a
+spoofed user_id is rejected — verified). No feed revalidation per tap (snappy).
+
+**Edge cases handled**: empty feed state; "Photo unavailable" placeholder when a
+signed URL can't be produced; oversized originals rejected client-side (25 MB)
+and compressed output capped server-side (8 MB); HEIC/undecodable images fall
+back to uploading the original if within cap, else a friendly error; empty
+status/caption length caps (status 100, caption 280).
+
+**Verified**: build + lint clean; a live integration test against the real
+project (throwaway 3rd user, cleaned up fully) passed all 16 checks — private
+bucket upload, signed-URL fetch returns bytes, feed embedded-author join + or-
+filter, reaction insert/toggle-delete, unique-constraint dedupe (23505), and RLS
+blocking a spoofed reaction (42501). Left the 2 existing accounts untouched; DB +
+storage restored to pre-test state.
+
+**Not done this phase (by roadmap)**: status posts do NOT yet upsert the
+`statuses` table — that's Phase 3 (mood dashboard) along with showing spirit
+animals on a dedicated screen. Streak updates on post = Phase 4. Time capsule
+composer toggle = Phase 5. `next/image` intentionally skipped in favor of plain
+`<img>` for expiring signed URLs (with eslint-disable) — fine for MVP.
+
+**Open (unchanged)**: final reaction emoji set is a taste call; current set is a
+placeholder.
+
 ## Phase 1 — Auth & onboarding (done)
 
 **Auth model**: invite-only username/password on top of Supabase Auth. Usernames

@@ -2,27 +2,27 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { getCurrentProfile } from "@/lib/auth/session"
-import { spiritAnimalEmoji } from "@/lib/spirit-animals"
+import { getFeed } from "@/lib/posts"
+import { Avatar } from "./_components/Avatar"
+import { Composer } from "./_components/Composer"
+import { PostCard } from "./_components/PostCard"
 import { SignOutButton } from "./_components/SignOutButton"
 
-// Authenticated home. The middleware already gates this route; the profile
-// check is a defensive backstop. This is a Phase 1 shell — the real feed lands
-// in Phase 2 and replaces the placeholder card below.
+// The feed re-reads posts on each request (reactions/photos change often).
+export const dynamic = "force-dynamic"
+
 export default async function Home() {
   const profile = await getCurrentProfile()
   if (!profile) redirect("/login")
 
+  const posts = await getFeed()
+
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-8 px-5 py-8">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-4 py-6">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl" aria-hidden>
-            {spiritAnimalEmoji(profile.spirit_animal)}
-          </span>
-          <div>
-            <p className="text-sm text-foreground/50">Signed in as</p>
-            <p className="font-medium">{profile.display_name}</p>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Avatar animalKey={profile.spirit_animal} size="sm" />
+          <p className="text-sm font-medium">{profile.display_name}</p>
         </div>
         <div className="flex items-center gap-4">
           {profile.is_admin && (
@@ -37,19 +37,22 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="rounded-xl border border-foreground/10 bg-foreground/[0.03] px-5 py-8 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          You&apos;re in, {profile.display_name}.
-        </h1>
-        <p className="mt-2 text-sm text-foreground/60">
-          Your spirit animal is set. The feed, posting, and reactions arrive in
-          the next phase.
-        </p>
-      </section>
+      <Composer />
 
-      <p className="text-center text-xs text-foreground/40">
-        Phase 1 · auth &amp; onboarding complete
-      </p>
+      {posts.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-12 text-center">
+          <p className="text-sm text-foreground/60">Nothing here yet.</p>
+          <p className="mt-1 text-xs text-foreground/40">
+            Post a photo or set a status to kick things off.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+      )}
     </main>
   )
 }
