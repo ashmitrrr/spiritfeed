@@ -138,7 +138,7 @@ export function OnboardingForm({
               minLength={3}
               maxLength={20}
               pattern="[A-Za-z0-9_]+"
-              placeholder="e.g. priya"
+              placeholder="e.g. ash"
               className="pixel-input px-3 py-2 text-sm"
             />
           </label>
