@@ -5,11 +5,32 @@ import { createServerClient } from "@supabase/ssr"
 import type { Database } from "@/lib/database.types"
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env"
 
+/** Paths reachable without a session (auth screens + auth endpoints). */
+function isPublicPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/join") ||
+    pathname.startsWith("/setup") ||
+    pathname.startsWith("/auth")
+  )
+}
+
+/** Auth screens an already-signed-in user shouldn't sit on. */
+function isAuthOnlyForGuests(pathname: string): boolean {
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/join") ||
+    pathname.startsWith("/setup")
+  )
+}
+
 /**
- * Keeps the Supabase auth session fresh on every request by rotating the auth
- * cookies. Route protection (redirecting unauthenticated users) is layered on
- * in Phase 1 once /login and /join exist — for now this just refreshes tokens
- * so the app is ready for auth without gating anything yet.
+ * Keeps the Supabase auth session fresh on every request (rotating the auth
+ * cookies) and gates routes:
+ *   - no session + private path        → redirect to /login
+ *   - has session + guest-only path     → redirect to / (the feed)
+ * Public paths are the auth screens (/login, /join, /setup) and the /auth
+ * endpoints (e.g. sign-out).
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -36,7 +57,23 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Touching getUser() triggers the token refresh + cookie rotation above.
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+
+  if (!user && !isPublicPath(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    return NextResponse.redirect(url)
+  }
+
+  if (user && isAuthOnlyForGuests(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/"
+    return NextResponse.redirect(url)
+  }
 
   return response
 }
