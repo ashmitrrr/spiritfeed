@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { notifyMentionedUsers } from "@/lib/mentions-server"
+import { pushAfterResponse } from "@/lib/push"
 import { PHOTO_BUCKET } from "@/lib/posts"
 import {
   CAPTION_MAX,
@@ -69,6 +71,8 @@ async function resolvePromptSubmission(
 // (photo/status) in v1 — for a 15-20 person group that's the highest-spam-risk
 // notification. Realtime already updates open feeds live. A possible fast-follow
 // is an opt-in "notify me about new posts" preference; left out on purpose here.
+// @mentions are the one exception — those DO push (see notifyMentionedUsers),
+// since a direct tag is targeted at one person rather than broadcast to everyone.
 
 /** Create a photo post: upload the (already client-compressed) image, then row. */
 export async function createPhotoPost(
@@ -129,6 +133,12 @@ export async function createPhotoPost(
     return { ok: false, error: "Couldn't save your post. Please try again." }
   }
 
+  if (caption) {
+    pushAfterResponse(async () => {
+      await notifyMentionedUsers(admin, user.id, caption)
+    })
+  }
+
   revalidatePath("/")
   return { ok: true }
 }
@@ -166,6 +176,10 @@ export async function createStatusPost(
   if (error) {
     return { ok: false, error: "Couldn't save your status. Please try again." }
   }
+
+  pushAfterResponse(async () => {
+    await notifyMentionedUsers(admin, user.id, text)
+  })
 
   revalidatePath("/")
   return { ok: true }
