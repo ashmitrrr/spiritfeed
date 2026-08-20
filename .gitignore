@@ -22,3 +22,8 @@ next-env.d.ts
 *.log
 npm-debug.log*
 .vercel
+
+# Planning/working docs — these drift fast and aren't meant to be public
+# right now. README.md is the exception; it stays tracked.
+*.md
+!README.md
