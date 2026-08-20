@@ -27,3 +27,6 @@ npm-debug.log*
 # right now. README.md is the exception; it stays tracked.
 *.md
 !README.md
+
+# Stray git-internal lock files (device-bridge artifact, safe to ignore)
+_to_delete/
