@@ -3,6 +3,7 @@ import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { relativeTime } from "@/lib/time"
 import { Avatar } from "./Avatar"
 import { CommentSection } from "./CommentSection"
+import { DeletePostButton } from "./DeletePostButton"
 import { ReactionBar } from "./ReactionBar"
 import { RichText } from "./RichText"
 
@@ -10,10 +11,13 @@ export function PostCard({
   post,
   crownHolderId,
   currentUserId,
+  isAdmin = false,
 }: {
   post: FeedPost
   crownHolderId?: string | null
   currentUserId: string
+  /** Shows an admin-only delete control regardless of who authored the post. */
+  isAdmin?: boolean
 }) {
   const tagline = spiritAnimalTagline(
     post.authorAnimal,
@@ -36,6 +40,7 @@ export function PostCard({
         <p className="shrink-0 text-xs text-ink/50">
           {relativeTime(post.createdAt)}
         </p>
+        {isAdmin && <DeletePostButton postId={post.id} />}
       </header>
 
       {post.postType === "status" ? (

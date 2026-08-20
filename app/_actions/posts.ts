@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getCurrentProfile } from "@/lib/auth/session"
 import { notifyMentionedUsers } from "@/lib/mentions-server"
 import { pushAfterResponse } from "@/lib/push"
 import { PHOTO_BUCKET } from "@/lib/posts"
@@ -180,6 +181,52 @@ export async function createStatusPost(
   pushAfterResponse(async () => {
     await notifyMentionedUsers(admin, user.id, text)
   })
+
+  revalidatePath("/")
+  return { ok: true }
+}
+
+
+export type DeletePostResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * Admin-only: permanently deletes any post (photo or status) from the feed,
+ * regardless of who posted it. RLS only lets a post's own author delete it —
+ * this is an explicit, gated override using the service-role client, same
+ * shape as `deleteUserCompletely`'s admin-bypass pattern.
+ */
+export async function deletePostAsAdmin(
+  postId: string,
+): Promise<DeletePostResult> {
+  const profile = await getCurrentProfile()
+  if (!profile || !profile.is_admin) {
+    return { ok: false, error: "Only admins can delete posts." }
+  }
+
+  const admin = createAdminClient()
+
+  const { data: post, error: fetchError } = await admin
+    .from("posts")
+    .select("id, photo_path")
+    .eq("id", postId)
+    .maybeSingle()
+  if (fetchError) return { ok: false, error: "Couldn't find that post." }
+  if (!post) return { ok: true } // already gone — nothing left to do
+
+  // weekly_recaps.top_post_id is NO ACTION → posts, so clear it first (same
+  // order-of-operations as deleteUserCompletely). Reactions and comments both
+  // cascade on post_id, so no explicit cleanup needed for those.
+  await admin
+    .from("weekly_recaps")
+    .update({ top_post_id: null })
+    .eq("top_post_id", postId)
+
+  if (post.photo_path) {
+    await admin.storage.from(PHOTO_BUCKET).remove([post.photo_path])
+  }
+
+  const { error: deleteError } = await admin.from("posts").delete().eq("id", postId)
+  if (deleteError) return { ok: false, error: "Couldn't delete that post." }
 
   revalidatePath("/")
   return { ok: true }
