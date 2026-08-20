@@ -1,18 +1,19 @@
-import Link from "next/link"
+import Image from "next/image"
 import { redirect } from "next/navigation"
 
 import { getCurrentProfile } from "@/lib/auth/session"
+import { getGroupMembers } from "@/lib/members"
 import { getMentionableUsers } from "@/lib/mentions-server"
 import { getFeed } from "@/lib/posts"
 import { getPromptContext } from "@/lib/prompts"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
+import spiritfeedWordmark from "@/logo_home.png"
 import { Avatar } from "./_components/Avatar"
 import { Composer } from "./_components/Composer"
-import { NotificationToggle } from "./_components/NotificationToggle"
+import { HeaderMenu } from "./_components/HeaderMenu"
 import { PostCard } from "./_components/PostCard"
 import { PromptCard } from "./_components/PromptCard"
 import { RealtimeRefresh } from "./_components/RealtimeRefresh"
-import { SignOutButton } from "./_components/SignOutButton"
 
 // The feed re-reads posts on each request (reactions/photos change often).
 export const dynamic = "force-dynamic"
@@ -21,10 +22,11 @@ export default async function Home() {
   const profile = await getCurrentProfile()
   if (!profile) redirect("/login")
 
-  const [posts, mentionables, prompt] = await Promise.all([
+  const [posts, mentionables, prompt, members] = await Promise.all([
     getFeed(),
     getMentionableUsers(),
     getPromptContext(profile.id),
+    getGroupMembers(),
   ])
 
   const promptSubmission =
@@ -34,7 +36,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
+      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Avatar
             animalKey={profile.spirit_animal}
@@ -60,20 +62,13 @@ export default async function Home() {
             )}
           </div>
         </div>
-        <span className="font-display text-base lowercase tracking-tight text-olive-dark">
-          spiritfeed
-        </span>
-        <div className="flex items-center gap-4">
-          <NotificationToggle />
-          {profile.is_admin && (
-            <Link
-              href="/admin"
-              className="text-sm text-ink/60 underline underline-offset-4 hover:text-ink"
-            >
-              Admin
-            </Link>
-          )}
-          <SignOutButton />
+        <Image
+          src={spiritfeedWordmark}
+          alt="spiritfeed"
+          className="mx-auto h-9 w-auto shrink-0"
+        />
+        <div className="flex justify-end">
+          <HeaderMenu isAdmin={profile.is_admin} members={members} />
         </div>
       </header>
 
