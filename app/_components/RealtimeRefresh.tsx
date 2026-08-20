@@ -29,6 +29,14 @@ const DEBOUNCE_MS = 700
  * re-deriving that on the client would risk subtle drift. Realtime is purely a
  * "something changed, refetch" nudge.
  *
+ * Also refetches on visibility/pageshow — mobile PWAs (iOS Safari standalone
+ * in particular) freeze backgrounded tabs, realtime socket included, so
+ * tapping a push notification just un-suspends the page as it last was rather
+ * than delivering whatever happened while it was backgrounded. Refetching
+ * whenever the tab becomes visible again (notification tap, app-switcher,
+ * unlocking the phone, etc.) means you always land on current data instead of
+ * a stale snapshot from before it was backgrounded.
+ *
  * NOTE: requires Realtime replication enabled on these tables (done via the
  * `enable_realtime_on_feed_tables` migration — ALTER PUBLICATION supabase_realtime).
  */
@@ -57,9 +65,17 @@ export function RealtimeRefresh() {
     }
     channel.subscribe()
 
+    const onVisible = () => {
+      if (document.visibilityState === "visible") scheduleRefresh()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("pageshow", onVisible)
+
     return () => {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
+      document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("pageshow", onVisible)
     }
   }, [router])
 
