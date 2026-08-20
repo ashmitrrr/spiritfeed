@@ -96,6 +96,7 @@ export default async function Home() {
               key={post.id}
               post={post}
               crownHolderId={prompt.crownHolderId}
+              currentUserId={profile.id}
             />
           ))}
         </div>

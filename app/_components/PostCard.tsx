@@ -2,15 +2,18 @@ import type { FeedPost } from "@/lib/posts"
 import { spiritAnimalTagline } from "@/lib/spirit-animals"
 import { relativeTime } from "@/lib/time"
 import { Avatar } from "./Avatar"
+import { CommentSection } from "./CommentSection"
 import { ReactionBar } from "./ReactionBar"
 import { RichText } from "./RichText"
 
 export function PostCard({
   post,
   crownHolderId,
+  currentUserId,
 }: {
   post: FeedPost
   crownHolderId?: string | null
+  currentUserId: string
 }) {
   const tagline = spiritAnimalTagline(
     post.authorAnimal,
@@ -78,6 +81,12 @@ export function PostCard({
         postId={post.id}
         initialCounts={post.reactionCounts}
         initialMine={post.myReactions}
+      />
+
+      <CommentSection
+        postId={post.id}
+        comments={post.comments}
+        currentUserId={currentUserId}
       />
     </article>
   )

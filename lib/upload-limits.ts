@@ -17,6 +17,10 @@ export const IMAGE_JPEG_QUALITY = 0.8
 export const CAPTION_MAX = 280
 export const STATUS_MAX = 100
 
+// Comments are meant to be one restrained line, not a reply essay — closer to
+// the status cap than the caption one.
+export const COMMENT_MAX = 140
+
 export function humanBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024)
   return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`

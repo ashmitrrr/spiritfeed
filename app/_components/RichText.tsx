@@ -1,8 +1,9 @@
 import { parseMentions } from "@/lib/mentions"
 
 /**
- * Renders caption/status text with @mentions styled as pixel tags. Pure
- * rendering — no linking or notifications (there's no notification system yet).
+ * Renders caption/status/comment text with @mentions styled as pixel tags.
+ * Pure rendering — mention pushes are handled separately server-side
+ * (see notifyMentionedUsers), this component only styles the tag.
  */
 export function RichText({
   text,

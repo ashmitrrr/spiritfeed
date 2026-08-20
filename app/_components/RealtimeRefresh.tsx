@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client"
 const WATCHED_TABLES = [
   "posts",
   "reactions",
+  "comments",
   "daily_prompts",
   "prompt_assignments",
   "spirit_crown",

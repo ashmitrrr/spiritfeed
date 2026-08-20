@@ -6,6 +6,15 @@ import { createAdminClient } from "@/lib/supabase/admin"
 export const PHOTO_BUCKET = "photos"
 const SIGNED_URL_TTL_SECONDS = 60 * 60 // 1 hour; feed reloads refresh them
 
+export type FeedComment = {
+  id: string
+  authorId: string
+  authorName: string
+  authorAnimal: string
+  body: string
+  createdAt: string
+}
+
 export type FeedPost = {
   id: string
   authorId: string
@@ -23,6 +32,8 @@ export type FeedPost = {
   isTimeCapsule: boolean
   reactionCounts: Record<string, number>
   myReactions: string[]
+  /** Flat, unthreaded — oldest first, matches how they render. */
+  comments: FeedComment[]
   /** Set when this post is a Prompt-of-the-Day submission. */
   dailyPromptId: string | null
   /** Fire-approval progress for prompt submissions; null for normal posts. */
@@ -40,8 +51,13 @@ type AuthorEmbed = {
   animal_adjective: string | null
 } | null
 
-function firstAuthor(value: AuthorEmbed | AuthorEmbed[]): AuthorEmbed {
-  return Array.isArray(value) ? (value[0] ?? null) : value
+type CommentAuthorEmbed = {
+  display_name: string
+  spirit_animal: string
+} | null
+
+function firstAuthor<T>(value: T | T[]): T {
+  return Array.isArray(value) ? (value[0] as T) : value
 }
 
 // Posts are ephemeral (BeReal-style): a regular post vanishes from the feed 24h
@@ -53,8 +69,9 @@ export const POST_TTL_MS = 24 * 60 * 60 * 1000
  * Loads the reverse-chronological feed for the signed-in user. Visibility:
  *   - regular posts (is_time_capsule = false): shown only while < 24h old
  *   - time capsules (is_time_capsule = true): shown once unlock_at has passed
- * Includes author info, signed photo URLs, and reaction tallies (with which
- * emojis the current user has used). Returns [] if there's no session.
+ * Includes author info, signed photo URLs, reaction tallies (with which
+ * emojis the current user has used), and comments. Returns [] if there's no
+ * session.
  *
  * The 24h cutoff here is instant: a post disappears the moment it crosses 24h,
  * independent of when the daily reaper job (which permanently deletes it) runs.
@@ -110,6 +127,31 @@ export async function getFeed(): Promise<FeedPost[]> {
     }
   }
 
+  // Comments for all visible posts — flat, oldest first, tiny scale like
+  // reactions above, so one query + in-memory grouping is plenty.
+  const { data: comments } = await supabase
+    .from("comments")
+    .select(
+      "id, post_id, author_id, body, created_at, author:profiles!comments_author_id_fkey(display_name, spirit_animal)",
+    )
+    .in("post_id", postIds)
+    .order("created_at", { ascending: true })
+
+  const commentsByPost = new Map<string, FeedComment[]>()
+  for (const c of comments ?? []) {
+    const author = firstAuthor<CommentAuthorEmbed>(c.author)
+    const list = commentsByPost.get(c.post_id) ?? []
+    list.push({
+      id: c.id,
+      authorId: c.author_id,
+      authorName: author?.display_name ?? "Unknown",
+      authorAnimal: author?.spirit_animal ?? "",
+      body: c.body,
+      createdAt: c.created_at,
+    })
+    commentsByPost.set(c.post_id, list)
+  }
+
   // Approval threshold only needed if a prompt submission is on screen.
   const hasPromptPost = posts.some((p) => p.daily_prompt_id)
   let fireThreshold = 0
@@ -139,7 +181,7 @@ export async function getFeed(): Promise<FeedPost[]> {
   }
 
   return posts.map((p) => {
-    const author = firstAuthor(p.author as AuthorEmbed | AuthorEmbed[])
+    const author = firstAuthor<AuthorEmbed>(p.author)
     const photoUrl = p.photo_path
       ? signedByPath.get(p.photo_path) ?? null
       : null
@@ -173,6 +215,7 @@ export async function getFeed(): Promise<FeedPost[]> {
       isTimeCapsule: p.is_time_capsule,
       reactionCounts: countsByPost.get(p.id) ?? {},
       myReactions: mineByPost.get(p.id) ?? [],
+      comments: commentsByPost.get(p.id) ?? [],
       dailyPromptId: p.daily_prompt_id,
       promptProgress,
     }
