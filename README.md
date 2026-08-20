@@ -57,4 +57,4 @@ Once that's all up, open `/setup`. It's a one-time bootstrap route that only wor
 
 ## Status
 
-Built and maintained for one friend group. Not looking for more users, not accepting outside contributions right now.
+Private project for the time being. Not looking for more users, not accepting outside contributions right now.
